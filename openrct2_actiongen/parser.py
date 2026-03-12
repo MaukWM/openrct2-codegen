@@ -35,6 +35,30 @@ _VISIT_UNNAMED_RE = re.compile(
 )
 
 
+# C++ type → JSON type resolution
+_CPP_TO_JSON_TYPE: dict[str, str] = {
+    "bool": "boolean",
+    "std::string": "string",
+}
+
+# Coordinate types → expanded field names (all fields are "number")
+COORD_EXPANSIONS: dict[str, list[str]] = {
+    "CoordsXY": ["x", "y"],
+    "CoordsXYZ": ["x", "y", "z"],
+    "CoordsXYZD": ["x", "y", "z", "direction"],
+    "MapRange": ["x1", "y1", "x2", "y2"],
+}
+
+
+@dataclass
+class ResolvedParam:
+    """A fully resolved action parameter."""
+
+    js_name: str
+    json_type: str   # "boolean", "number", or "string"
+    cpp_type: str    # original C++ type for reference
+
+
 @dataclass
 class VisitCall:
     """A single visitor.Visit() call extracted from AcceptParameters."""
@@ -114,6 +138,50 @@ def parse_member_types(header_path: Path) -> dict[str, str]:
     text = header_path.read_text()
     matches = _MEMBER_DECL_RE.findall(text)
     return {member: cpp_type for cpp_type, member in matches}
+
+
+def resolve_params(
+    calls: list[VisitCall], member_types: dict[str, str]
+) -> list[ResolvedParam]:
+    """Resolve Visit calls + member types into final parameter list.
+
+    Expands coordinate types into individual fields.
+    Maps C++ types to JSON types (bool→boolean, string→string, else→number).
+    """
+    params: list[ResolvedParam] = []
+
+    for call in calls:
+        base_member = call.member.split(".")[0]
+        cpp_type = member_types.get(base_member, "unknown")
+
+        if call.js_name is None:
+            # Unnamed coordinate — expand based on type
+            fields = COORD_EXPANSIONS.get(cpp_type)
+            if fields is None:
+                raise ValueError(
+                    f"Unnamed Visit for member {call.member} has "
+                    f"unrecognized coordinate type: {cpp_type}"
+                )
+            for field in fields:
+                params.append(ResolvedParam(
+                    js_name=field, json_type="number", cpp_type=cpp_type,
+                ))
+        else:
+            # Named parameter — resolve type
+            json_type = _cpp_to_json_type(cpp_type)
+            params.append(ResolvedParam(
+                js_name=call.js_name, json_type=json_type, cpp_type=cpp_type,
+            ))
+
+    return params
+
+
+def _cpp_to_json_type(cpp_type: str) -> str:
+    """Map a C++ type to a JSON type."""
+    if cpp_type in _CPP_TO_JSON_TYPE:
+        return _CPP_TO_JSON_TYPE[cpp_type]
+    # Everything else (int32_t, uint8_t, enums, RideId, etc.) is a number
+    return "number"
 
 
 def find_header_for_action(source_root: Path, class_name: str) -> Path | None:
