@@ -1,0 +1,31 @@
+[project]
+name = "openrct2-actiongen"
+version = "0.1.0"
+description = "Parse OpenRCT2 C++ source to generate action binding definitions"
+readme = "README.md"
+authors = [
+    { name = "Mauk Muller", email = "mauk@elnino.tech" }
+]
+requires-python = ">=3.13"
+dependencies = [
+    "tree-sitter>=0.25",
+    "tree-sitter-cpp>=0.23",
+    "click>=8.1",
+    "pydantic>=2.10",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+    "ruff>=0.9",
+]
+
+[project.scripts]
+openrct2-actiongen = "openrct2_actiongen.cli:main"
+
+[tool.uv]
+package = true
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
