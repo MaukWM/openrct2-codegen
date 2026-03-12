@@ -1,6 +1,7 @@
 """Parse OpenRCT2 C++ source to extract action definitions."""
 
 import re
+from dataclasses import dataclass
 from pathlib import Path
 
 import tree_sitter_cpp as tscpp
@@ -15,6 +16,24 @@ _PLUGIN_API_VERSION_RE = re.compile(
 _ACTION_NAME_RE = re.compile(
     r'\{\s*"(\w+)"\s*,\s*GameCommand::(\w+)\s*\}'
 )
+
+# 2-arg form: visitor.Visit("jsName", _member) or visitor.Visit("jsName", _member.field)
+_VISIT_NAMED_RE = re.compile(
+    r'visitor\.Visit\(\s*"(\w+)"\s*,\s*(\w+(?:\.\w+)?)\s*\)'
+)
+
+# 1-arg form: visitor.Visit(_member) — unnamed coordinate
+_VISIT_UNNAMED_RE = re.compile(
+    r'visitor\.Visit\(\s*(_\w+)\s*\)'
+)
+
+
+@dataclass
+class VisitCall:
+    """A single visitor.Visit() call extracted from AcceptParameters."""
+
+    js_name: str | None  # None for unnamed coordinates
+    member: str          # C++ member: "_rideType", "_origin", "_slope.type"
 
 
 def parse_plugin_api_version(source_root: Path) -> int:
@@ -55,6 +74,28 @@ def parse_action_name_map(source_root: Path) -> dict[str, str]:
         raise ValueError("No action entries found in ActionNameToType map")
 
     return {js_name: enum_name for js_name, enum_name in matches}
+
+
+def extract_visit_calls(body: str) -> list[VisitCall]:
+    """Extract visitor.Visit() calls from an AcceptParameters body.
+
+    Returns calls in order of appearance.
+    """
+    calls: list[VisitCall] = []
+
+    for line in body.splitlines():
+        # Try 2-arg (named) first — it's more specific
+        m = _VISIT_NAMED_RE.search(line)
+        if m:
+            calls.append(VisitCall(js_name=m.group(1), member=m.group(2)))
+            continue
+
+        # Try 1-arg (unnamed coordinate)
+        m = _VISIT_UNNAMED_RE.search(line)
+        if m:
+            calls.append(VisitCall(js_name=None, member=m.group(1)))
+
+    return calls
 
 
 def _get_parser() -> Parser:
