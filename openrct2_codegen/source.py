@@ -107,6 +107,7 @@ def _sparse_clone(version: str, dest: Path) -> None:
                 "git", "sparse-checkout", "set",
                 "src/openrct2/actions",
                 "src/openrct2/scripting",
+                "distribution",
             ],
             cwd=dest,
             check=True,
@@ -143,11 +144,20 @@ def _shallow_clone(version: str, dest: Path) -> None:
         raise RuntimeError(f"Shallow clone failed for {version}: {e.stderr}") from e
 
 
+def get_dts_path(source_root: Path) -> Path:
+    """Return the path to openrct2.d.ts within a source root."""
+    return source_root / "distribution" / "openrct2.d.ts"
+
+
 def _validate_source(source_root: Path) -> None:
     """Sanity-check that the source has the files we need."""
     script_engine = source_root / "src" / "openrct2" / "scripting" / "ScriptEngine.cpp"
     if not script_engine.exists():
         raise FileNotFoundError(f"ScriptEngine.cpp not found at {script_engine}")
+
+    dts = get_dts_path(source_root)
+    if not dts.exists():
+        raise FileNotFoundError(f"openrct2.d.ts not found at {dts}")
 
     action_files = list(source_root.glob("src/openrct2/actions/**/*Action.cpp"))
     if len(action_files) < MIN_ACTION_FILES:

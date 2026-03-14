@@ -8,12 +8,13 @@ import click
 from openrct2_codegen.codegen import render_template
 from openrct2_codegen.ir import ActionsIR
 from openrct2_codegen.parser import parse_actions
-from openrct2_codegen.source import get_source
+from openrct2_codegen.source import get_dts_path, get_source
+from openrct2_codegen.state_parser import parse_state
 
 
 @click.group()
 def main() -> None:
-    """Parse OpenRCT2 C++ source to generate action binding definitions."""
+    """Generate action and state bindings from OpenRCT2 source."""
 
 
 @main.command()
@@ -30,29 +31,47 @@ def main() -> None:
     help="Path to local OpenRCT2 source checkout.",
 )
 @click.option(
-    "--ir",
+    "--actions-out",
     type=click.Path(path_type=Path),
-    default=Path("actions.json"),
-    help="Output path for actions.json IR.",
+    default=Path("generated/actions.json"),
     show_default=True,
+    help="Output path for actions.json IR.",
+)
+@click.option(
+    "--state-out",
+    type=click.Path(path_type=Path),
+    default=Path("generated/state.json"),
+    show_default=True,
+    help="Output path for state.json IR.",
 )
 @click.option("--verbose", is_flag=True, help="Show detailed progress.")
 def generate(
     openrct2_version: str | None,
     openrct2_source: Path | None,
-    ir: Path,
+    actions_out: Path,
+    state_out: Path,
     verbose: bool,
 ) -> None:
-    """Generate actions.json IR from OpenRCT2 source."""
+    """Generate actions.json and state.json IRs from OpenRCT2 source."""
     source_root = get_source(version=openrct2_version, local_path=openrct2_source)
     version = openrct2_version or source_root.name
 
-    click.echo(f"Parsing {version} source at {source_root}")
+    actions_out.parent.mkdir(parents=True, exist_ok=True)
+    state_out.parent.mkdir(parents=True, exist_ok=True)
+    click.echo(f"Source: OpenRCT2 {version} at {source_root}")
+
+    # Actions IR
     actions_ir = parse_actions(source_root, version=version)
     click.echo(f"Parsed {len(actions_ir.actions)} actions")
+    actions_out.write_text(json.dumps(actions_ir.model_dump(), indent=2) + "\n")
+    click.echo(f"actions.json → {actions_out}")
 
-    ir.write_text(json.dumps(actions_ir.model_dump(), indent=2) + "\n")
-    click.echo(f"IR written to {ir}")
+    # State IR
+    dts_path = get_dts_path(source_root)
+    state_ir = parse_state(dts_path, openrct2_version=version, source_root=source_root)
+    click.echo(f"Parsed {len(state_ir.interfaces)} interfaces, {len(state_ir.enums)} enums")
+    state_out.write_text(state_ir.model_dump_json(indent=2))
+    click.echo(f"state.json  → {state_out}")
 
 
 @main.command()
@@ -71,18 +90,19 @@ def generate(
 @click.option(
     "--out",
     type=click.Path(path_type=Path),
-    required=True,
-    help="Output path for rendered file.",
+    default=None,
+    help="Output path for rendered file. Defaults to generated/<template>.",
 )
 def render(
     ir: Path,
     template: str,
-    out: Path,
+    out: Path | None,
 ) -> None:
-    """Render a codegen template from an actions.json IR file."""
-    actions_ir = ActionsIR.model_validate_json(ir.read_text())
-    click.echo(f"Loaded {len(actions_ir.actions)} actions from {ir}")
+    """Render a codegen template from an IR file."""
+    out = out or Path("generated") / template
+    out.parent.mkdir(parents=True, exist_ok=True)
 
+    actions_ir = ActionsIR.model_validate_json(ir.read_text())
     rendered = render_template(template, actions_ir)
     out.write_text(rendered)
-    click.echo(f"Rendered {template} to {out}")
+    click.echo(f"{template} → {out}")
