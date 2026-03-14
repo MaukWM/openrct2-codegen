@@ -78,20 +78,21 @@ def generate(
 @click.option(
     "--ir",
     type=click.Path(exists=True, path_type=Path),
-    required=True,
+    default=Path("generated/actions.json"),
+    show_default=True,
     help="Path to actions.json IR file.",
 )
 @click.option(
     "--template",
-    type=str,
+    type=click.Choice(["actions.ts", "actions.py"]),
     required=True,
-    help="Template to render (e.g. actions.ts).",
+    help="Template to render.",
 )
 @click.option(
     "--out",
     type=click.Path(path_type=Path),
     default=None,
-    help="Output path for rendered file. Defaults to generated/<template>.",
+    help="Output path. Defaults to generated/<template>.",
 )
 def render(
     ir: Path,

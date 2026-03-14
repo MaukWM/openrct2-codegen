@@ -1,14 +1,39 @@
-# openrct2-actiongen
+# openrct2-codegen
 
-Parses OpenRCT2 C++ source to extract game action signatures into a structured `actions.json`. This IR feeds Jinja2 templates to generate JS plugin handlers and Python Pydantic models.
+Parses OpenRCT2 source to generate action and state bindings for the `openrct2-bridge` plugin and `pyrct2` Python client.
+
+**Two IRs, one command:**
+- `actions.json` — parsed from OpenRCT2 C++ source (all 81 game actions with parameter signatures)
+- `state.json` — parsed from `openrct2.d.ts` (all readable game state interfaces, enums, and unions)
+
+Both feed Jinja2 templates that generate TypeScript plugin handlers and Python Pydantic models.
 
 ## Usage
 
+### 1. Generate IRs
+
 ```bash
-uv run openrct2-actiongen generate --openrct2-version v0.4.32
-uv run openrct2-actiongen generate --openrct2-version v0.4.32 --output actions.json
-uv run openrct2-actiongen generate --openrct2-source /path/to/OpenRCT2
+openrct2-codegen generate --openrct2-version v0.4.32
+# → generated/actions.json
+# → generated/state.json
 ```
+
+Downloads the OpenRCT2 source for the given version (sparse clone, cached at `~/.cache/openrct2-codegen/`). Pass `--openrct2-source /path/to/OpenRCT2` to use a local checkout instead.
+
+### 2. Render templates
+
+```bash
+# Render to generated/ for inspection
+openrct2-codegen render --template actions.ts
+openrct2-codegen render --template actions.py
+
+# Render directly to target repo
+openrct2-codegen render --template actions.ts --out ../openrct2-bridge/src/actions.ts
+openrct2-codegen render --template actions.py --out ../pyrct2/pyrct2/_generated/actions.py
+```
+
+`--ir` defaults to `generated/actions.json`. All output defaults to `generated/<template>`.
+
 
 ## Version compatibility
 
