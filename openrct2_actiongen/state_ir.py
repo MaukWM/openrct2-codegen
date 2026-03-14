@@ -21,21 +21,23 @@ from pydantic import BaseModel
 class ScalarProperty(BaseModel):
     ir_type: Literal["scalar"]
     name: str
-    ts_type: Literal["number", "boolean", "string"]
+    ts_type: str                 # "number", "boolean", "string", or raw unknown
+    optional: bool = False
 
 
 class ArrayProperty(BaseModel):
     ir_type: Literal["array"]
     name: str
-    ts_type: str           # e.g. "Award[]"
-    item_interface: str    # e.g. "Award"
+    ts_type: str                 # e.g. "Award[]"
+    item_interface: str          # e.g. "Award"
 
 
 class InterfaceProperty(BaseModel):
     ir_type: Literal["interface"]
     name: str
-    ts_type: str           # e.g. "ScenarioObjective"
-    interface: str         # e.g. "ScenarioObjective"
+    ts_type: str                 # e.g. "ScenarioObjective"
+    interface: str               # e.g. "ScenarioObjective"
+    optional: bool = False
 
 
 class FlagsProperty(BaseModel):
@@ -47,8 +49,9 @@ class FlagsProperty(BaseModel):
 class EnumRefProperty(BaseModel):
     ir_type: Literal["enum_ref"]
     name: str
-    ts_type: str           # e.g. "AwardType"
-    enum: str              # e.g. "AwardType"
+    ts_type: str                 # e.g. "AwardType"
+    enum: str                    # e.g. "AwardType"
+    optional: bool = False
 
 
 Property = Annotated[
@@ -71,12 +74,12 @@ class Interface(BaseModel):
 class Namespace(BaseModel):
     """A top-level global variable exposed by the OpenRCT2 plugin API.
 
-    e.g. `var park: Park` → name="park", ts_interface="Park", endpoint="park"
+    e.g. `var park: Park` → name="park", ts_interface="Park"
+    The bridge endpoint name is always the global var name.
     """
 
     name: str            # global var name: "park", "cheats", "date"
     ts_interface: str    # interface it implements: "Park", "Cheats", "GameDate"
-    endpoint: str        # bridge endpoint prefix: "park", "park.cheats", "date"
 
 
 # ── Top-level IR ──────────────────────────────────────────────────────
