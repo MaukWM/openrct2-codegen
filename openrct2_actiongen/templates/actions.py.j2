@@ -34,6 +34,9 @@ class {{ action.cpp_class | replace("Action", "Params") }}(BaseModel):
 
 class _ActionsMixin:
     """Auto-generated game action methods. Do not edit."""
+
+    def execute(self, endpoint: str, params: dict | BaseModel | None = None) -> dict:
+        raise NotImplementedError  # provided by RCT2
 {% for action in actions %}
 
     def {{ action.cpp_class | cpp_class_to_method }}(
