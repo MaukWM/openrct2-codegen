@@ -9,6 +9,7 @@ import openrct2_codegen.actions.codegen as actions_codegen
 import openrct2_codegen.state.codegen as state_codegen
 from openrct2_codegen.actions.ir import ActionsIR
 from openrct2_codegen.actions.parser import parse_actions
+from openrct2_codegen.enums.parser import parse_enums
 from openrct2_codegen.source import get_dts_path, get_source
 from openrct2_codegen.state.ir import StateIR
 from openrct2_codegen.state.parser import parse_state
@@ -46,20 +47,29 @@ def main() -> None:
     show_default=True,
     help="Output path for state.json IR.",
 )
+@click.option(
+    "--enums-out",
+    type=click.Path(path_type=Path),
+    default=Path("generated/enums.json"),
+    show_default=True,
+    help="Output path for enums.json IR.",
+)
 @click.option("--verbose", is_flag=True, help="Show detailed progress.")
 def generate(
     openrct2_version: str | None,
     openrct2_source: Path | None,
     actions_out: Path,
     state_out: Path,
+    enums_out: Path,
     verbose: bool,
 ) -> None:
-    """Generate actions.json and state.json IRs from OpenRCT2 source."""
+    """Generate actions.json, state.json, and enums.json IRs from OpenRCT2 source."""
     source_root = get_source(version=openrct2_version, local_path=openrct2_source)
     version = openrct2_version or source_root.name
 
     actions_out.parent.mkdir(parents=True, exist_ok=True)
     state_out.parent.mkdir(parents=True, exist_ok=True)
+    enums_out.parent.mkdir(parents=True, exist_ok=True)
     click.echo(f"Source: OpenRCT2 {version} at {source_root}")
 
     # Actions IR
@@ -74,6 +84,12 @@ def generate(
     click.echo(f"Parsed {len(state_ir.interfaces)} interfaces, {len(state_ir.enums)} enums")
     state_out.write_text(state_ir.model_dump_json(indent=2))
     click.echo(f"state.json  → {state_out}")
+
+    # Enums IR
+    enums_ir = parse_enums(source_root, version=version)
+    click.echo(f"Parsed {len(enums_ir.enums)} enum types")
+    enums_out.write_text(enums_ir.model_dump_json(indent=2))
+    click.echo(f"enums.json  → {enums_out}")
 
 
 _ACTIONS_TEMPLATES = {"actions.ts", "actions.py"}

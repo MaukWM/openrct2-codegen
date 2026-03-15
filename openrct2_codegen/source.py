@@ -19,6 +19,8 @@ SPARSE_PATHS = [
     "src/openrct2/entity",
     "src/openrct2/ride",
     "src/openrct2/drawing",
+    "src/openrct2/world",
+    "src/openrct2/interface",
     "distribution",
 ]
 
@@ -196,6 +198,8 @@ def _validate_source(source_root: Path) -> None:
         source_root / "src" / "openrct2" / "entity" / "Guest.h",
         source_root / "src" / "openrct2" / "ride" / "ShopItem.h",
         source_root / "src" / "openrct2" / "drawing" / "Colour.h",
+        source_root / "src" / "openrct2" / "world" / "MapSelection.h",
+        source_root / "src" / "openrct2" / "interface" / "Window.h",
     ]:
         if not expected.exists():
             raise FileNotFoundError(f"Enum source file not found: {expected}")

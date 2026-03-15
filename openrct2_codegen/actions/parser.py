@@ -58,6 +58,18 @@ COORD_EXPANSIONS: dict[str, list[str]] = {
     "MapRange": ["x1", "y1", "x2", "y2"],
 }
 
+# Namespace-qualified types → canonical name used as key in enums.json
+_NAMESPACE_ALIASES: dict[str, str] = {
+    "Drawing::Colour": "Colour",
+}
+
+# Struct sub-field overrides: (struct_cpp_type, field_name) → actual cpp_type
+# Used when AcceptParameters visits _foo.field rather than _foo directly.
+_STRUCT_FIELD_TYPES: dict[tuple[str, str], str] = {
+    ("FootpathSlope", "type"):      "FootpathSlopeType",
+    ("FootpathSlope", "direction"): "Direction",
+}
+
 
 @dataclass
 class ResolvedParam:
@@ -229,8 +241,17 @@ def resolve_params(
     params: list[ResolvedParam] = []
 
     for call in calls:
-        base_member = call.member.split(".")[0]
+        parts = call.member.split(".", 1)
+        base_member = parts[0]
+        sub_field = parts[1] if len(parts) > 1 else None
         cpp_type = member_types.get(base_member, "unknown")
+
+        # Resolve struct sub-field to the actual field type
+        if sub_field is not None:
+            cpp_type = _STRUCT_FIELD_TYPES.get((cpp_type, sub_field), cpp_type)
+
+        # Strip namespace qualifiers (e.g. Drawing::Colour → Colour)
+        cpp_type = _NAMESPACE_ALIASES.get(cpp_type, cpp_type)
 
         if call.js_name is None:
             # Unnamed coordinate — expand based on type
