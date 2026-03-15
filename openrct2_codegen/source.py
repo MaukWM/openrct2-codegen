@@ -12,6 +12,16 @@ MIN_ACTION_FILES = 50
 # Sparse clone features (--sparse, --filter) require git 2.25+
 MIN_GIT_VERSION = (2, 25)
 
+# Directories fetched by the sparse clone
+SPARSE_PATHS = [
+    "src/openrct2/actions",
+    "src/openrct2/scripting",
+    "src/openrct2/entity",
+    "src/openrct2/ride",
+    "src/openrct2/drawing",
+    "distribution",
+]
+
 
 def get_cache_path(version: str) -> Path:
     """Return the cache directory for a given version tag."""
@@ -48,7 +58,14 @@ def _download(version: str) -> Path:
     """Download source via sparse clone (or full shallow clone as fallback)."""
     cache_path = get_cache_path(version)
     if cache_path.exists():
-        _validate_source(cache_path)
+        try:
+            _validate_source(cache_path)
+        except FileNotFoundError:
+            # Cache exists but is missing files (e.g. sparse paths were expanded).
+            # Attempt to repair by updating the sparse checkout in place.
+            print(f"Cache at {cache_path} is incomplete — updating sparse checkout...")
+            _repair_sparse_checkout(cache_path)
+            _validate_source(cache_path)
         return cache_path
 
     git_version = _check_git()
@@ -103,12 +120,7 @@ def _sparse_clone(version: str, dest: Path) -> None:
             text=True,
         )
         subprocess.run(
-            [
-                "git", "sparse-checkout", "set",
-                "src/openrct2/actions",
-                "src/openrct2/scripting",
-                "distribution",
-            ],
+            ["git", "sparse-checkout", "set", *SPARSE_PATHS],
             cwd=dest,
             check=True,
             capture_output=True,
@@ -144,6 +156,20 @@ def _shallow_clone(version: str, dest: Path) -> None:
         raise RuntimeError(f"Shallow clone failed for {version}: {e.stderr}") from e
 
 
+def _repair_sparse_checkout(dest: Path) -> None:
+    """Expand the sparse checkout of an existing clone to include all required paths."""
+    try:
+        subprocess.run(
+            ["git", "sparse-checkout", "set", *SPARSE_PATHS],
+            cwd=dest,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+    except subprocess.CalledProcessError as e:
+        raise RuntimeError(f"Failed to repair sparse checkout at {dest}: {e.stderr}") from e
+
+
 def get_dts_path(source_root: Path) -> Path:
     """Return the path to openrct2.d.ts within a source root."""
     return source_root / "distribution" / "openrct2.d.ts"
@@ -164,3 +190,12 @@ def _validate_source(source_root: Path) -> None:
         raise FileNotFoundError(
             f"Expected at least {MIN_ACTION_FILES} action files, found {len(action_files)}"
         )
+
+    # Enum source files (added in sparse path expansion for enums parser)
+    for expected in [
+        source_root / "src" / "openrct2" / "entity" / "Guest.h",
+        source_root / "src" / "openrct2" / "ride" / "ShopItem.h",
+        source_root / "src" / "openrct2" / "drawing" / "Colour.h",
+    ]:
+        if not expected.exists():
+            raise FileNotFoundError(f"Enum source file not found: {expected}")

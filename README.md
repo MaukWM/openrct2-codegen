@@ -2,11 +2,12 @@
 
 Parses OpenRCT2 source to generate action and state bindings for the `openrct2-bridge` plugin and `pyrct2` Python client.
 
-**Two IRs, one command:**
+**Three IRs, one command:**
 - `actions.json` — parsed from OpenRCT2 C++ source (all 81 game actions with parameter signatures)
 - `state.json` — parsed from `openrct2.d.ts` (all readable game state interfaces, enums, and unions)
+- `enums.json` — parsed from OpenRCT2 C++ headers (integer→name mappings for ~30 numeric enum types)
 
-Both feed Jinja2 templates that generate TypeScript plugin handlers and Python Pydantic models.
+All three feed Jinja2 templates that generate TypeScript plugin handlers and Python Pydantic models.
 
 ## Usage
 
@@ -57,3 +58,12 @@ v0.4.25 (2025-08-03): + Award, AwardType (park.awards)  ← minimum for full IR
 ```
 
 Current target: **v0.4.32** (Plugin API v110).
+
+### Enums (`enums.json`)
+
+Development and testing was done against **v0.4.32**. Mileage will vary for older versions:
+
+- Integer values for all enums are stable across versions (OpenRCT2's save-game compatibility policy prevents reshuffling)
+- String names change when the project does mass renames (e.g. PascalCase → lowerCamelCase sprint in Oct–Dec 2025)
+- New values are added over time (ride types ~3/year, cheat types ~2/year) — unknown integers degrade gracefully to `"unknown_<n>"` rather than crashing
+- `drawing/Colour.h` was introduced in v0.4.31; the colour enum is unavailable on older version tags
