@@ -7,7 +7,8 @@
 
 from __future__ import annotations
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
+from pydantic.alias_generators import to_camel
 
 # API version this file was generated against.
 # pyrct2 compares this against get_version() at connect time.
@@ -17,10 +18,15 @@ GENERATED_API_VERSION: int = {{ api_version }}
 # ---------------------------------------------------------------------------
 # Action parameter models
 # ---------------------------------------------------------------------------
+
+class _ActionParams(BaseModel):
+    """Base for all action parameter models. Serializes fields as camelCase."""
+
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 {% for action in actions %}
 {% if action.parameters %}
 
-class {{ action.cpp_class | replace("Action", "Params") }}(BaseModel):
+class {{ action.cpp_class | replace("Action", "Params") }}(_ActionParams):
 {% for p in action.parameters %}
     {{ p.name | camel_to_snake }}: {{ p.type | ir_type_to_py }}
 {% endfor %}
