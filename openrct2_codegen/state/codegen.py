@@ -1,11 +1,57 @@
 """Render Jinja2 templates from a StateIR."""
 
+import re
 from pathlib import Path
 
 from openrct2_codegen.render import make_env
 from openrct2_codegen.state.ir import StateIR
 
 _TEMPLATES_DIR = Path(__file__).parent / "templates"
+
+
+def _camel_to_snake(name: str) -> str:
+    """Convert camelCase to snake_case: 'bankLoan' → 'bank_loan'."""
+    return re.sub(r"(?<=[a-z0-9])(?=[A-Z])", "_", name).lower()
+
+
+def _py_type(prop: dict) -> str:
+    """Return the Python type annotation string for a property dict."""
+    ir_type = prop["ir_type"]
+    optional = prop.get("optional", False)
+    ts_type = prop.get("ts_type", "")
+
+    if ir_type == "scalar":
+        if ts_type == "number":
+            base = "int"
+        elif ts_type == "boolean":
+            base = "bool"
+        elif ts_type == "string":
+            base = "str"
+        elif ts_type.startswith('"') and ts_type.endswith('"'):
+            base = f'Literal["{ts_type[1:-1]}"]'
+        else:
+            base = "Any"
+    elif ir_type == "enum_ref":
+        base = "str"
+    elif ir_type == "interface":
+        base = prop["interface"]
+    elif ir_type == "flags":
+        base = prop["flag_union"]
+    elif ir_type == "array":
+        item_type = prop.get("item_type") or "Any"
+        item_kind = prop.get("item_kind", "")
+        base = f"list[{item_type}]" if item_kind == "interface" else "list[str]"
+    elif ir_type == "union":
+        union_name = prop.get("union_name") or "Any"
+        if prop.get("is_array"):
+            base = f"list[{union_name}]"
+        else:
+            # Non-array unions are nullable (TS type is "X | null")
+            return f"{union_name} | None"
+    else:
+        base = "Any"
+
+    return f"{base} | None" if optional else base
 
 
 def _pascal(name: str) -> str:
@@ -93,7 +139,7 @@ def render_template(template_name: str, ir: StateIR) -> str:
             "properties": [p.model_dump() for p in iface.properties],
         })
 
-    env = make_env(_TEMPLATES_DIR, {"pascal": _pascal})
+    env = make_env(_TEMPLATES_DIR, {"pascal": _pascal, "camel_to_snake": _camel_to_snake, "py_type": _py_type})
     template = env.get_template(j2_file.name)
 
     return template.render(

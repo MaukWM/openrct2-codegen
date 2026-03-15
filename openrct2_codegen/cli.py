@@ -77,7 +77,7 @@ def generate(
 
 
 _ACTIONS_TEMPLATES = {"actions.ts", "actions.py"}
-_STATE_TEMPLATES = {"queries.ts"}
+_STATE_TEMPLATES = {"state.ts", "state.py"}
 
 
 @main.command()
