@@ -61,6 +61,7 @@ COORD_EXPANSIONS: dict[str, list[str]] = {
 # Namespace-qualified types → canonical name used as key in enums.json
 _NAMESPACE_ALIASES: dict[str, str] = {
     "Drawing::Colour": "Colour",
+    "Network::CheatType_t": "CheatType",
 }
 
 # Struct sub-field overrides: (struct_cpp_type, field_name) → actual cpp_type
