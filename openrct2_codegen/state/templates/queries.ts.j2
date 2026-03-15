@@ -57,7 +57,11 @@ function serialize{{ iface.name }}(item: {{ iface.name }}): object {
     return {
 {% for prop in iface.properties %}
 {% if prop.ir_type == "scalar" or prop.ir_type == "enum_ref" %}
+{% if prop.optional %}
+        {{ prop.name }}: item.{{ prop.name }} !== undefined ? item.{{ prop.name }} : null,
+{% else %}
         {{ prop.name }}: item.{{ prop.name }},
+{% endif %}
 {% elif prop.ir_type == "interface" %}
         {{ prop.name }}: serialize{{ prop.interface }}(item.{{ prop.name }}),
 {% elif prop.ir_type == "flags" %}
@@ -129,7 +133,11 @@ function get{{ ns.name | pascal }}(): object {
     return {
 {% for prop in ns.properties %}
 {% if prop.ir_type == "scalar" or prop.ir_type == "enum_ref" %}
+{% if prop.optional %}
+        {{ prop.name }}: {{ ns.name }}.{{ prop.name }} !== undefined ? {{ ns.name }}.{{ prop.name }} : null,
+{% else %}
         {{ prop.name }}: {{ ns.name }}.{{ prop.name }},
+{% endif %}
 {% elif prop.ir_type == "array" and prop.item_kind == "enum" %}
         {{ prop.name }}: {{ ns.name }}.{{ prop.name }},
 {% else %}
@@ -157,7 +165,11 @@ export function handleQuery(endpoint: string, params: any, reply: (response: obj
 {% for prop in ns.properties %}
         case "{{ ns.name }}.{{ prop.name }}":
 {% if prop.ir_type == "scalar" or prop.ir_type == "enum_ref" %}
+{% if prop.optional %}
+            reply({ success: true, payload: {{ ns.name }}.{{ prop.name }} !== undefined ? {{ ns.name }}.{{ prop.name }} : null });
+{% else %}
             reply({ success: true, payload: {{ ns.name }}.{{ prop.name }} });
+{% endif %}
 {% elif prop.ir_type == "array" and prop.item_kind == "enum" %}
             reply({ success: true, payload: {{ ns.name }}.{{ prop.name }} });
 {% else %}
