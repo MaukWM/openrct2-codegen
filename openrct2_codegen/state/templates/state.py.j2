@@ -8,6 +8,9 @@ from typing import Annotated, Any, Literal, Union
 
 from pydantic import BaseModel, Field
 
+# API version this file was generated against.
+GENERATED_API_VERSION: int = {{ api_version }}
+
 # ── Union variant models ──────────────────────────────────────────────────────
 {% for iface in union_variants %}
 
