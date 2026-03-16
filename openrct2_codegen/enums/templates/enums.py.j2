@@ -5,14 +5,14 @@
 # DO NOT EDIT — regenerate with:
 #   openrct2-codegen render --template enums.py --out <path>
 
-from enum import IntEnum
+from enum import IntEnum, IntFlag
 
 # OpenRCT2 version these enums were generated against.
 GENERATED_OPENRCT2_VERSION: str = "{{ openrct2_version }}"
 
 {% for enum_name, enum_def in enums.items() %}
 
-class {{ enum_name }}(IntEnum):
+class {{ enum_name }}({{ "IntFlag" if enum_def["kind"] == "flags" else "IntEnum" }}):
 {% for val in enum_def["values"] %}
     {{ val.name | to_screaming_snake }} = {{ val.value }}
 {% endfor %}

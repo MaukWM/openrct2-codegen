@@ -235,6 +235,40 @@ def parse_enums(source_root: Path, version: str) -> EnumsIR:
         ],
     )
 
+    # Synthetic flags: bitflag types that are `using` typedefs with constexpr constants,
+    # not `enum class` definitions. Too few and too inconsistent to justify a parser.
+
+    # src/openrct2/actions/terraform/ClearAction.h
+    enums["ClearableItems"] = EnumDef(
+        source="synthetic",
+        kind="flags",
+        values=[
+            EnumValue(name="scenerySmall", value=1),
+            EnumValue(name="sceneryLarge", value=2),
+            EnumValue(name="sceneryFootpath", value=4),
+        ],
+    )
+
+    # src/openrct2/world/Footpath.h
+    enums["PathConstructFlags"] = EnumDef(
+        source="synthetic",
+        kind="flags",
+        values=[
+            EnumValue(name="isQueue", value=1),
+            EnumValue(name="isLegacyPathObject", value=2),
+        ],
+    )
+
+    # src/openrct2/ride/RideConstruction.h — LiftHillAndInverted enum inside FlagHolder
+    enums["SelectedLiftAndInverted"] = EnumDef(
+        source="synthetic",
+        kind="flags",
+        values=[
+            EnumValue(name="liftHill", value=1),
+            EnumValue(name="inverted", value=2),
+        ],
+    )
+
     return EnumsIR(
         openrct2_version=version,
         generated_at=datetime.now(timezone.utc).isoformat(),

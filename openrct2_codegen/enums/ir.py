@@ -1,5 +1,7 @@
 """IR schema for enums.json — integer-to-name mappings for OpenRCT2 numeric enums."""
 
+from typing import Literal
+
 from pydantic import BaseModel
 
 
@@ -14,6 +16,7 @@ class EnumDef(BaseModel):
     """All active values for one enum type."""
 
     source: str              # relative path to the C++ source file, e.g. "src/openrct2/ride/RideData.cpp"
+    kind: Literal["enum", "flags"] = "enum"  # "enum" → IntEnum, "flags" → IntFlag
     values: list[EnumValue]  # ordered by integer value
 
 
