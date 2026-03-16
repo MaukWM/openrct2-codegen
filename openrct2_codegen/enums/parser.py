@@ -20,10 +20,10 @@ _ENUM_BLOCK_RE = re.compile(
     # placeholder — compiled per enum name in parse_enum_class()
 )
 
-# Matches a single value line inside an enum body.
-# Groups: (1) name, (2) explicit value (hex or decimal) or None
+# Matches a single enum entry line.
+# Groups: (1) name, (2) raw assignment if present (number, hex, or member name), or None
 _VALUE_RE = re.compile(
-    r"^\s*(\w+)\s*(?:=\s*(0[xX][0-9a-fA-F]+|-?\d+))?\s*,?",
+    r"^\s*(\w+)\s*(?:=\s*([\w\-]+))?\s*,?",
     re.MULTILINE,
 )
 
@@ -55,12 +55,8 @@ def _screaming_snake_to_camel(name: str) -> str:
 # Parse functions
 # ---------------------------------------------------------------------------
 
-def parse_enum_class(source: str, cpp_name: str) -> list[EnumValue]:
-    """Extract all values from a named C++ enum class in source text.
-
-    Handles both explicit assignments (``Mode = 0``) and implicit sequential
-    values.  Normalises names to lowerCamelCase.
-    """
+def _extract_enum_body(source: str, cpp_name: str) -> str:
+    """Find the brace-delimited body of ``enum class <cpp_name>`` in source."""
     pattern = re.compile(
         rf"enum\s+class\s+{re.escape(cpp_name)}\s*(?::\s*[\w:]+\s*)?\{{([^}}]*)\}}",
         re.DOTALL,
@@ -68,20 +64,65 @@ def parse_enum_class(source: str, cpp_name: str) -> list[EnumValue]:
     m = pattern.search(source)
     if m is None:
         raise ValueError(f"enum class '{cpp_name}' not found in source")
+    return m.group(1)
 
-    body = m.group(1)
+
+def _parse_raw_entries(body: str) -> list[tuple[str, str | None]]:
+    """Pass 1: extract (name, raw_assignment) pairs from enum body.
+
+    raw_assignment is the string after ``=`` if present, else None.
+    Examples: ("TrackColourMain", None), ("MazeStyle", "TrackColourSupports"), ("Foo", "0xFF").
+    """
+    return [(m.group(1), m.group(2)) for m in _VALUE_RE.finditer(body)]
+
+
+def _resolve_values(raw_entries: list[tuple[str, str | None]], cpp_name: str) -> list[EnumValue]:
+    """Pass 2: resolve each entry to an integer value.
+
+    Three cases:
+    - No assignment: sequential counter (previous + 1, starting at 0)
+    - Numeric literal (decimal or hex): use that value, counter follows from it
+    - Member reference (another entry name): look up its already-resolved value
+    """
+    known: dict[str, int] = {}  # C++ name → resolved integer
     values: list[EnumValue] = []
     counter = 0
 
-    for vm in _VALUE_RE.finditer(body):
-        name = vm.group(1)
-        if vm.group(2) is not None:
-            raw = vm.group(2)
-            counter = int(raw, 16) if raw.lower().startswith("0x") else int(raw)
+    for name, raw in raw_entries:
+        if raw is None:
+            # Implicit sequential
+            pass
+        elif raw.lstrip("-").isdigit():
+            # Decimal literal
+            counter = int(raw)
+        elif raw.lower().startswith("0x"):
+            # Hex literal
+            counter = int(raw, 16)
+        elif raw in known:
+            # Member reference — reuse the same integer value
+            counter = known[raw]
+        else:
+            raise ValueError(
+                f"enum class '{cpp_name}': cannot resolve '{name} = {raw}'"
+            )
+
+        known[name] = counter
         values.append(EnumValue(name=_to_camel(name), value=counter))
         counter += 1
 
     return values
+
+
+def parse_enum_class(source: str, cpp_name: str) -> list[EnumValue]:
+    """Extract all values from a named C++ enum class in source text.
+
+    Two-pass approach:
+    1. Extract raw (name, assignment) pairs from the enum body
+    2. Resolve each to an integer — numeric literals, sequential counting, or member references
+    """
+    body = _extract_enum_body(source, cpp_name)
+    raw_entries = _parse_raw_entries(body)
+    return _resolve_values(raw_entries, cpp_name)
 
 
 def parse_ride_type_array(source: str) -> list[EnumValue]:
