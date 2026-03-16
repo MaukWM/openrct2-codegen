@@ -1,6 +1,6 @@
 [project]
 name = "openrct2-codegen"
-version = "0.4.2"
+version = "0.4.3"
 description = "Parse OpenRCT2 C++ source to generate action and state binding definitions"
 readme = "README.md"
 authors = [
