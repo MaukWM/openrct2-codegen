@@ -6,6 +6,10 @@ from typing import Literal
 
 from pydantic import BaseModel
 
+CppType = str
+ParamName = str
+EnumName = str
+
 
 class ActionParameter(BaseModel):
     """A single parameter accepted by a game action."""
@@ -13,6 +17,7 @@ class ActionParameter(BaseModel):
     name: str
     type: Literal["boolean", "number", "string"]
     cpp_type: str
+    enum_type: EnumName | None = None
 
 
 class Action(BaseModel):
@@ -35,3 +40,47 @@ class ActionsIR(BaseModel):
     generated_at: str
     generator_version: str
     actions: list[Action]
+
+
+# -- Enum enrichment --------------------------------------------------------
+#
+# Resolves cpp_type (and optionally param name) to a known enum name.
+# Called during `generate` after both actions and enums are parsed.
+
+# cpp_type → enum: for types whose name doesn't match the enum exactly.
+_CPP_TYPE_TO_ENUM: dict[CppType, EnumName] = {
+    "ride_type_t": "RideType",
+}
+
+# (cpp_type, param_name) → enum: for compound types where only one field is an enum.
+# CoordsXYZD expands to (x, y, z, direction) — only `direction` is a Direction enum.
+_CPP_TYPE_NAME_TO_ENUM: dict[tuple[CppType, ParamName], EnumName] = {
+    ("CoordsXYZD", "direction"): "Direction",
+}
+
+
+def enrich_enum_types(actions_ir: ActionsIR, enum_names: set[EnumName]) -> None:
+    """Resolve and set ``enum_type`` on every action parameter where possible.
+
+    Mutates *actions_ir* in place. Resolution order:
+    1. (cpp_type, param_name) conditional overrides
+    2. cpp_type manual overrides (for naming mismatches)
+    3. Direct match: cpp_type == enum name
+    """
+    # Build the lookup: cpp_type → enum (direct matches + manual overrides).
+    type_map: dict[CppType, EnumName] = {name: name for name in enum_names}
+    for cpp_type, enum_name in _CPP_TYPE_TO_ENUM.items():
+        if enum_name in enum_names:
+            type_map[cpp_type] = enum_name
+
+    # Build the name-conditional lookup (only for entries whose target enum exists).
+    name_map = {k: v for k, v in _CPP_TYPE_NAME_TO_ENUM.items() if v in enum_names}
+
+    for action in actions_ir.actions:
+        for p in action.parameters:
+            # Priority 1: (cpp_type, name) conditional override.
+            resolved = name_map.get((p.cpp_type, p.name))
+            if resolved is None:
+                # Priority 2+3: cpp_type override or direct match.
+                resolved = type_map.get(p.cpp_type)
+            p.enum_type = resolved
