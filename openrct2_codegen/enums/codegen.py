@@ -14,8 +14,12 @@ def _to_screaming_snake(name: str) -> str:
 
     spiralRollerCoaster → SPIRAL_ROLLER_COASTER
     TrackColourMain → TRACK_COLOUR_MAIN
+    3dCinema → _3D_CINEMA  (Python identifiers can't start with a digit)
     """
-    return re.sub(r"(?<=[a-z0-9])(?=[A-Z])", "_", name).upper()
+    result = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", "_", name).upper()
+    if result[0].isdigit():
+        result = f"_{result}"
+    return result
 
 
 _FILTERS = {
