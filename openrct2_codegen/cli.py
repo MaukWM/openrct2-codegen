@@ -6,9 +6,11 @@ from pathlib import Path
 import click
 
 import openrct2_codegen.actions.codegen as actions_codegen
+import openrct2_codegen.enums.codegen as enums_codegen
 import openrct2_codegen.state.codegen as state_codegen
 from openrct2_codegen.actions.ir import ActionsIR
 from openrct2_codegen.actions.parser import parse_actions
+from openrct2_codegen.enums.ir import EnumsIR
 from openrct2_codegen.enums.parser import parse_enums
 from openrct2_codegen.source import get_dts_path, get_source
 from openrct2_codegen.state.ir import StateIR
@@ -94,12 +96,13 @@ def generate(
 
 _ACTIONS_TEMPLATES = {"actions.ts", "actions.py"}
 _STATE_TEMPLATES = {"state.ts", "state.py"}
+_ENUMS_TEMPLATES = {"enums.py"}
 
 
 @main.command()
 @click.option(
     "--template",
-    type=click.Choice(sorted(_ACTIONS_TEMPLATES | _STATE_TEMPLATES)),
+    type=click.Choice(sorted(_ACTIONS_TEMPLATES | _STATE_TEMPLATES | _ENUMS_TEMPLATES)),
     required=True,
     help="Template to render.",
 )
@@ -127,7 +130,13 @@ def render(
     out = out or Path("generated") / template
     out.parent.mkdir(parents=True, exist_ok=True)
 
-    if template in _STATE_TEMPLATES:
+    if template in _ENUMS_TEMPLATES:
+        ir = ir or Path("generated/enums.json")
+        if not ir.exists():
+            raise click.ClickException(f"IR file not found: {ir} — run 'generate' first.")
+        enums_ir = EnumsIR.model_validate_json(ir.read_text())
+        rendered = enums_codegen.render_template(template, enums_ir)
+    elif template in _STATE_TEMPLATES:
         ir = ir or Path("generated/state.json")
         if not ir.exists():
             raise click.ClickException(f"IR file not found: {ir} — run 'generate' first.")
