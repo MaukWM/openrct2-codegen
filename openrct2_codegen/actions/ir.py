@@ -54,11 +54,14 @@ _CPP_TYPE_TO_ENUM: dict[CppType, EnumName] = {
 
 # (cpp_type, param_name) → enum: for types where cpp_type is generic but
 # the param name reveals the semantic type.
-# - CoordsXYZD expands to (x, y, z, direction) — only `direction` is Direction.
-# - staffType is stored as uint8_t but semantically is StaffType.
+# Entries marked "migratable" can be removed if the C++ source adopts the enum type
+# directly — the direct-match path in enrich_enum_types would then handle them.
 _CPP_TYPE_NAME_TO_ENUM: dict[tuple[CppType, ParamName], EnumName] = {
     ("CoordsXYZD", "direction"): "Direction",
-    ("uint8_t", "staffType"): "StaffType",
+    ("uint8_t", "staffType"): "StaffType",              # migratable: if C++ uses StaffType directly
+    ("uint8_t", "speed"): "GameSpeed",                   # not migratable: no C++ enum exists
+    ("uint8_t", "fundingAmount"): "ResearchFundingLevel", # migratable: if C++ adopts enum class
+    ("int32_t", "type"): "AdvertisingCampaignType",       # migratable: if C++ adopts enum class
 }
 
 

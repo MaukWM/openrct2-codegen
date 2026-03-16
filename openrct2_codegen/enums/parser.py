@@ -269,6 +269,51 @@ def parse_enums(source_root: Path, version: str) -> EnumsIR:
         ],
     )
 
+    # Synthetic enums: old-style C enums (not `enum class`) that our parser can't handle.
+    # If OpenRCT2 migrates these to `enum class` in a future release, they can be moved
+    # to _ENUM_TARGETS and parsed automatically — remove the synthetic entry at that point.
+
+    # Old C enum in src/openrct2/management/Marketing.h.
+    # Migratable: if OpenRCT2 converts to `enum class AdvertisingCampaignType`, add to
+    # _ENUM_TARGETS and remove this block.
+    enums["AdvertisingCampaignType"] = EnumDef(
+        source="synthetic",
+        values=[
+            EnumValue(name="parkEntryFree", value=0),
+            EnumValue(name="rideFree", value=1),
+            EnumValue(name="parkEntryHalfPrice", value=2),
+            EnumValue(name="foodOrDrinkFree", value=3),
+            EnumValue(name="park", value=4),
+            EnumValue(name="ride", value=5),
+        ],
+    )
+
+    # Old C enum in src/openrct2/management/Research.h.
+    # Migratable: if OpenRCT2 converts to `enum class ResearchFundingLevel`, add to
+    # _ENUM_TARGETS and remove this block.
+    enums["ResearchFundingLevel"] = EnumDef(
+        source="synthetic",
+        values=[
+            EnumValue(name="none", value=0),
+            EnumValue(name="minimum", value=1),
+            EnumValue(name="normal", value=2),
+            EnumValue(name="maximum", value=3),
+        ],
+    )
+
+    # No enum in C++ source — validated inline as 1..4 (1..8 with debug tools).
+    # src/openrct2/actions/general/GameSetSpeedAction.cpp
+    # Not migratable: no C++ enum exists, purely a range check.
+    enums["GameSpeed"] = EnumDef(
+        source="synthetic",
+        values=[
+            EnumValue(name="normal", value=1),
+            EnumValue(name="fast", value=2),
+            EnumValue(name="faster", value=3),
+            EnumValue(name="fastest", value=4),
+        ],
+    )
+
     return EnumsIR(
         openrct2_version=version,
         generated_at=datetime.now(timezone.utc).isoformat(),
