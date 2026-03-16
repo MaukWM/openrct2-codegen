@@ -52,10 +52,13 @@ _CPP_TYPE_TO_ENUM: dict[CppType, EnumName] = {
     "ride_type_t": "RideType",
 }
 
-# (cpp_type, param_name) → enum: for compound types where only one field is an enum.
-# CoordsXYZD expands to (x, y, z, direction) — only `direction` is a Direction enum.
+# (cpp_type, param_name) → enum: for types where cpp_type is generic but
+# the param name reveals the semantic type.
+# - CoordsXYZD expands to (x, y, z, direction) — only `direction` is Direction.
+# - staffType is stored as uint8_t but semantically is StaffType.
 _CPP_TYPE_NAME_TO_ENUM: dict[tuple[CppType, ParamName], EnumName] = {
     ("CoordsXYZD", "direction"): "Direction",
+    ("uint8_t", "staffType"): "StaffType",
 }
 
 

@@ -163,6 +163,7 @@ _ENUM_TARGETS: list[_Target] = [
     _Target("src/openrct2/entity/Peep.h",   "PeepAnimationType",    "PeepAnimationType",    "enum_class"),
     _Target("src/openrct2/entity/Peep.h",   "PeepAnimationGroup",   "PeepAnimationGroup",   "enum_class"),
     _Target("src/openrct2/entity/Litter.h", "Type",                 "LitterType",           "enum_class"),
+    _Target("src/openrct2/entity/Staff.h",  "StaffType",            "StaffType",            "enum_class"),
     # ── ride/ ────────────────────────────────────────────────────────────────
     _Target("src/openrct2/ride/RideData.cpp", "RideType",           "RideType",             "array_index"),
     _Target("src/openrct2/ride/Ride.h",     "RideMode",             "RideMode",             "enum_class"),
