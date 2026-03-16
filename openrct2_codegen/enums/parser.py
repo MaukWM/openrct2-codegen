@@ -222,6 +222,18 @@ def parse_enums(source_root: Path, version: str) -> EnumsIR:
 
         enums[target.ir_name] = EnumDef(source=target.file, values=values)
 
+    # Synthetic enum: Direction is a uint8_t typedef (not an enum class), always 0-3.
+    # Values from TileElementBase.h: TILE_ELEMENT_DIRECTION_{WEST,NORTH,EAST,SOUTH}
+    enums["Direction"] = EnumDef(
+        source="synthetic",
+        values=[
+            EnumValue(name="west", value=0),
+            EnumValue(name="north", value=1),
+            EnumValue(name="east", value=2),
+            EnumValue(name="south", value=3),
+        ],
+    )
+
     return EnumsIR(
         openrct2_version=version,
         generated_at=datetime.now(timezone.utc).isoformat(),
