@@ -9,6 +9,14 @@ from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict
 from pydantic.alias_generators import to_camel
+{% if enum_imports %}
+
+from pyrct2.enums import (
+{% for name in enum_imports %}
+    {{ name }},
+{% endfor %}
+)
+{% endif %}
 
 # API version this file was generated against.
 # pyrct2 compares this against get_version() at connect time.
@@ -28,7 +36,7 @@ class _ActionParams(BaseModel):
 
 class {{ action.cpp_class | replace("Action", "Params") }}(_ActionParams):
 {% for p in action.parameters %}
-    {{ p.name | camel_to_snake }}: {{ p.type | ir_type_to_py }}
+    {{ p.name | camel_to_snake }}: {{ p | py_type }}
 {% endfor %}
 {% endif %}
 {% endfor %}
@@ -48,7 +56,7 @@ class ActionsProxy:
     def {{ action.cpp_class | cpp_class_to_method }}(
         self,
 {% for p in action.parameters %}
-        {{ p.name | camel_to_snake }}: {{ p.type | ir_type_to_py }},
+        {{ p.name | camel_to_snake }}: {{ p | py_type }},
 {% endfor %}
     ) -> dict:
 {% if action.parameters %}

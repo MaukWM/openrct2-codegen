@@ -1,12 +1,37 @@
 """Render Jinja2 templates from an ActionsIR."""
 
+from __future__ import annotations
+
 import re
+import warnings
 from pathlib import Path
 
 from openrct2_codegen.actions.ir import ActionsIR
+from openrct2_codegen.enums.ir import EnumsIR
 from openrct2_codegen.render import make_env
 
 _TEMPLATES_DIR = Path(__file__).parent / "templates"
+
+# Manual overrides for cpp_type names that don't exactly match an enum name.
+_CPP_TYPE_TO_ENUM: dict[str, str] = {
+    "ride_type_t": "RideType",
+}
+
+
+def _build_enum_map(enum_names: set[str]) -> dict[str, str]:
+    """Build a cpp_type → enum name mapping.
+
+    Direct matches (cpp_type == enum name) are discovered automatically.
+    Manual overrides in _CPP_TYPE_TO_ENUM are only applied when the target
+    enum exists in the provided set.
+    """
+    mapping: dict[str, str] = {}
+    for name in enum_names:
+        mapping[name] = name
+    for cpp_type, enum_name in _CPP_TYPE_TO_ENUM.items():
+        if enum_name in enum_names:
+            mapping[cpp_type] = enum_name
+    return mapping
 
 
 def _cpp_class_to_method(cpp_class: str) -> str:
@@ -28,30 +53,62 @@ def _camel_to_snake(name: str) -> str:
     return re.sub(r"(?<=[a-z])(?=[A-Z])", "_", name).lower()
 
 
-def _ir_type_to_py(ir_type: str) -> str:
-    """Map an IR type string to a Python type annotation string.
+def _make_py_type_filter(enum_map: dict[str, str]):
+    """Create a Jinja2 filter that maps a parameter dict to a Python type string.
 
-    number -> int
-    boolean -> bool
-    string -> str
+    Parameters whose cpp_type resolves to a known enum get that enum name.
+    Everything else falls back to ir_type → int/bool/str.
     """
-    return {"number": "int", "boolean": "bool", "string": "str"}[ir_type]
+    _ir_fallback = {"number": "int", "boolean": "bool", "string": "str"}
+
+    def _py_type(param: dict) -> str:
+        enum_name = enum_map.get(param["cpp_type"])
+        if enum_name is not None:
+            return enum_name
+        return _ir_fallback[param["type"]]
+
+    return _py_type
 
 
-_FILTERS = {
-    "cpp_class_to_method": _cpp_class_to_method,
-    "camel_to_snake": _camel_to_snake,
-    "ir_type_to_py": _ir_type_to_py,
-}
+def render_template(
+    template_name: str,
+    ir: ActionsIR,
+    enums_ir: EnumsIR | None = None,
+) -> str:
+    """Render an actions codegen template with the given IR.
 
-
-def render_template(template_name: str, ir: ActionsIR) -> str:
-    """Render an actions codegen template with the given IR."""
+    When *enums_ir* is provided, action parameters whose C++ type matches a
+    known enum are annotated with that enum type instead of plain ``int``.
+    """
     j2_file = _TEMPLATES_DIR / f"{template_name}.j2"
     if not j2_file.is_file():
         raise ValueError(f"Unknown template: {template_name!r} (no file at {j2_file})")
 
-    env = make_env(_TEMPLATES_DIR, _FILTERS)
+    if enums_ir is not None and enums_ir.openrct2_version != ir.openrct2_version:
+        warnings.warn(
+            f"OpenRCT2 version mismatch: actions IR is {ir.openrct2_version}, "
+            f"enums IR is {enums_ir.openrct2_version}. "
+            f"Enum types may be inaccurate.",
+            stacklevel=2,
+        )
+
+    enum_map = _build_enum_map(set(enums_ir.enums.keys()) if enums_ir else set())
+
+    # Collect the set of enum names actually used by any action parameter.
+    used_enums: set[str] = set()
+    for action in ir.actions:
+        for p in action.parameters:
+            enum_name = enum_map.get(p.cpp_type)
+            if enum_name is not None:
+                used_enums.add(enum_name)
+
+    filters = {
+        "cpp_class_to_method": _cpp_class_to_method,
+        "camel_to_snake": _camel_to_snake,
+        "py_type": _make_py_type_filter(enum_map),
+    }
+
+    env = make_env(_TEMPLATES_DIR, filters)
     template = env.get_template(j2_file.name)
 
     return template.render(
@@ -60,4 +117,5 @@ def render_template(template_name: str, ir: ActionsIR) -> str:
         api_version=ir.api_version,
         generated_at=ir.generated_at,
         actions=[a.model_dump() for a in ir.actions],
+        enum_imports=sorted(used_enums),
     )

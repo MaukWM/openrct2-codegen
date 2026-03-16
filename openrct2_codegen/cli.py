@@ -17,6 +17,11 @@ from openrct2_codegen.state.ir import StateIR
 from openrct2_codegen.state.parser import parse_state
 
 
+_DEFAULT_ACTIONS_IR = Path("generated/actions.json")
+_DEFAULT_STATE_IR = Path("generated/state.json")
+_DEFAULT_ENUMS_IR = Path("generated/enums.json")
+
+
 @click.group()
 def main() -> None:
     """Generate action and state bindings from OpenRCT2 source."""
@@ -38,21 +43,21 @@ def main() -> None:
 @click.option(
     "--actions-out",
     type=click.Path(path_type=Path),
-    default=Path("generated/actions.json"),
+    default=_DEFAULT_ACTIONS_IR,
     show_default=True,
     help="Output path for actions.json IR.",
 )
 @click.option(
     "--state-out",
     type=click.Path(path_type=Path),
-    default=Path("generated/state.json"),
+    default=_DEFAULT_STATE_IR,
     show_default=True,
     help="Output path for state.json IR.",
 )
 @click.option(
     "--enums-out",
     type=click.Path(path_type=Path),
-    default=Path("generated/enums.json"),
+    default=_DEFAULT_ENUMS_IR,
     show_default=True,
     help="Output path for enums.json IR.",
 )
@@ -111,8 +116,18 @@ _ENUMS_TEMPLATES = {"enums.py"}
     type=click.Path(path_type=Path),
     default=None,
     help=(
-        "Path to IR file. Defaults to generated/actions.json for actions templates, "
-        "generated/state.json for state templates."
+        f"Path to IR file. Defaults to {_DEFAULT_ACTIONS_IR} for actions templates, "
+        f"{_DEFAULT_STATE_IR} for state templates, {_DEFAULT_ENUMS_IR} for enums templates."
+    ),
+)
+@click.option(
+    "--enums-ir",
+    "enums_ir_path",
+    type=click.Path(path_type=Path),
+    default=None,
+    help=(
+        "Path to enums.json IR for enum-typed action parameters. "
+        f"Auto-discovered at {_DEFAULT_ENUMS_IR} when rendering actions templates."
     ),
 )
 @click.option(
@@ -124,6 +139,7 @@ _ENUMS_TEMPLATES = {"enums.py"}
 def render(
     template: str,
     ir: Path | None,
+    enums_ir_path: Path | None,
     out: Path | None,
 ) -> None:
     """Render a codegen template from an IR file."""
@@ -131,23 +147,31 @@ def render(
     out.parent.mkdir(parents=True, exist_ok=True)
 
     if template in _ENUMS_TEMPLATES:
-        ir = ir or Path("generated/enums.json")
+        ir = ir or _DEFAULT_ENUMS_IR
         if not ir.exists():
             raise click.ClickException(f"IR file not found: {ir} — run 'generate' first.")
         enums_ir = EnumsIR.model_validate_json(ir.read_text())
         rendered = enums_codegen.render_template(template, enums_ir)
     elif template in _STATE_TEMPLATES:
-        ir = ir or Path("generated/state.json")
+        ir = ir or _DEFAULT_STATE_IR
         if not ir.exists():
             raise click.ClickException(f"IR file not found: {ir} — run 'generate' first.")
         state_ir = StateIR.model_validate_json(ir.read_text())
         rendered = state_codegen.render_template(template, state_ir)
     else:
-        ir = ir or Path("generated/actions.json")
+        ir = ir or _DEFAULT_ACTIONS_IR
         if not ir.exists():
             raise click.ClickException(f"IR file not found: {ir} — run 'generate' first.")
         actions_ir = ActionsIR.model_validate_json(ir.read_text())
-        rendered = actions_codegen.render_template(template, actions_ir)
+
+        # Auto-discover enums IR for enum-typed parameters.
+        enums_ir = None
+        enums_path = enums_ir_path or _DEFAULT_ENUMS_IR
+        if enums_path.exists():
+            enums_ir = EnumsIR.model_validate_json(enums_path.read_text())
+            click.echo(f"Using enums IR: {enums_path}")
+
+        rendered = actions_codegen.render_template(template, actions_ir, enums_ir=enums_ir)
 
     out.write_text(rendered)
     click.echo(f"{template} → {out}")
