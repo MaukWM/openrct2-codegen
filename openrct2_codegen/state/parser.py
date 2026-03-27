@@ -350,8 +350,8 @@ def _parse_interface_flattened(
     properties from ancestors first, then the interface's own properties.
     """
     chain = _get_inheritance_chain(text, name)
-    properties = []
-    seen_names: set[str] = set()
+    props_by_name: dict[str, object] = {}
+    ordered_names: list[str] = []
 
     for iface_name in chain:
         parsed = _parse_interface(
@@ -361,11 +361,11 @@ def _parse_interface_flattened(
         if parsed is None:
             return None
         for prop in parsed.properties:
-            if prop.name not in seen_names:
-                properties.append(prop)
-                seen_names.add(prop.name)
+            if prop.name not in props_by_name:
+                ordered_names.append(prop.name)
+            props_by_name[prop.name] = prop  # child overrides parent
 
-    return Interface(name=name, properties=properties)
+    return Interface(name=name, properties=[props_by_name[n] for n in ordered_names])
 
 
 # ── Recursive interface collection ────────────────────────────────────
@@ -476,15 +476,28 @@ def parse_state(dts_path: Path, openrct2_version: str, source_root: Path) -> Sta
                     raise ValueError(f"Entity interface '{ec.ts_interface}' not found in .d.ts")
                 interfaces[iface.name] = iface
 
-        # Collect nested interfaces referenced by entity properties
-        entity_roots = [ec.ts_interface] if not ec.is_union else interface_unions.get(ec.ts_interface, [])
-        nested = _collect_interfaces(
-            text, entity_roots, known_interfaces, known_enums,
-            interface_unions, union_discriminators,
-        )
-        for k, v in nested.items():
-            if k not in interfaces:
-                interfaces[k] = v
+        # Collect nested interfaces referenced by entity properties (from flattened interfaces)
+        entity_iface_names = [ec.ts_interface] if not ec.is_union else interface_unions.get(ec.ts_interface, [])
+        nested_roots: list[str] = []
+        for ename in entity_iface_names:
+            if ename in interfaces:
+                for prop in interfaces[ename].properties:
+                    if prop.ir_type == "array" and prop.item_kind == "interface" and prop.item_type not in interfaces:
+                        nested_roots.append(prop.item_type)
+                    elif prop.ir_type == "interface" and prop.interface not in interfaces:
+                        nested_roots.append(prop.interface)
+                    elif prop.ir_type == "union":
+                        for variant in prop.variants:
+                            if variant not in interfaces:
+                                nested_roots.append(variant)
+        if nested_roots:
+            nested = _collect_interfaces(
+                text, nested_roots, known_interfaces, known_enums,
+                interface_unions, union_discriminators,
+            )
+            for k, v in nested.items():
+                if k not in interfaces:
+                    interfaces[k] = v
 
     # Trim enums to only those actually referenced in the collected interfaces
     referenced_enums: set[str] = set()

@@ -78,7 +78,7 @@ def _enrich_unions(interfaces, interface_unions):
             if not iface:
                 continue
             for prop in iface.properties:
-                if _literal_value(prop.ts_type) is not None:
+                if hasattr(prop, "ts_type") and _literal_value(prop.ts_type) is not None:
                     discriminator_field = prop.name
                     break
             if discriminator_field:
@@ -90,7 +90,7 @@ def _enrich_unions(interfaces, interface_unions):
             disc_value = None
             if discriminator_field and iface:
                 for prop in iface.properties:
-                    if prop.name == discriminator_field:
+                    if prop.name == discriminator_field and hasattr(prop, "ts_type"):
                         disc_value = _literal_value(prop.ts_type)
                         break
             variants_enriched.append({
@@ -139,6 +139,15 @@ def render_template(template_name: str, ir: StateIR) -> str:
             "properties": [p.model_dump() for p in iface.properties],
         })
 
+    entity_collections = []
+    for ec in ir.entity_collections:
+        entity_collections.append({
+            "name": ec.name,
+            "access": ec.access,
+            "ts_interface": ec.ts_interface,
+            "is_union": ec.is_union,
+        })
+
     env = make_env(_TEMPLATES_DIR, {"pascal": _pascal, "camel_to_snake": _camel_to_snake, "py_type": _py_type})
     template = env.get_template(j2_file.name)
 
@@ -148,6 +157,7 @@ def render_template(template_name: str, ir: StateIR) -> str:
         api_version=ir.api_version,
         generated_at=ir.generated_at,
         namespaces=namespaces,
+        entity_collections=entity_collections,
         interfaces={k: v.model_dump() for k, v in ir.interfaces.items()},
         enums=ir.enums,
         unions=enriched_unions,

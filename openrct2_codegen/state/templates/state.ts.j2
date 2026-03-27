@@ -10,9 +10,45 @@
 {% for iface in union_variants %}
 
 function serialize{{ iface.name }}(item: {{ iface.name }}): object {
+{% for prop in iface.properties %}
+{% if prop.ir_type == "flags" %}
+    var flags: any = {};
+{% for flag in enums[prop.flag_union] %}
+    flags["{{ flag }}"] = item.getFlag("{{ flag }}");
+{% endfor %}
+{% elif prop.ir_type == "array" and prop.item_kind == "interface" %}
+    var {{ prop.name }}: object[] = [];
+    for (var i_{{ prop.name }} = 0; i_{{ prop.name }} < item.{{ prop.name }}.length; i_{{ prop.name }}++) {
+        {{ prop.name }}.push(serialize{{ prop.item_type }}(item.{{ prop.name }}[i_{{ prop.name }}]));
+    }
+{% elif prop.ir_type == "union" and prop.is_array %}
+    var {{ prop.name }}: object[] = [];
+    for (var i_{{ prop.name }} = 0; i_{{ prop.name }} < item.{{ prop.name }}.length; i_{{ prop.name }}++) {
+        {{ prop.name }}.push(serialize{{ prop.union_name }}(item.{{ prop.name }}[i_{{ prop.name }}]));
+    }
+{% endif %}
+{% endfor %}
     return {
 {% for prop in iface.properties %}
+{% if prop.ir_type == "scalar" or prop.ir_type == "enum_ref" %}
+{% if prop.optional %}
+        {{ prop.name }}: item.{{ prop.name }} !== undefined ? item.{{ prop.name }} : null,
+{% else %}
         {{ prop.name }}: item.{{ prop.name }},
+{% endif %}
+{% elif prop.ir_type == "interface" %}
+        {{ prop.name }}: serialize{{ prop.interface }}(item.{{ prop.name }}),
+{% elif prop.ir_type == "flags" %}
+        flags: flags,
+{% elif prop.ir_type == "array" and prop.item_kind == "interface" %}
+        {{ prop.name }}: {{ prop.name }},
+{% elif prop.ir_type == "array" and prop.item_kind == "enum" %}
+        {{ prop.name }}: item.{{ prop.name }},
+{% elif prop.ir_type == "union" and prop.is_array %}
+        {{ prop.name }}: {{ prop.name }},
+{% elif prop.ir_type == "union" and not prop.is_array %}
+        {{ prop.name }}: item.{{ prop.name }} !== null ? serialize{{ prop.union_name }}(item.{{ prop.name }} as {{ prop.union_name }}) : null,
+{% endif %}
 {% endfor %}
     };
 }
@@ -42,7 +78,12 @@ function serialize{{ union_name }}(item: {{ union_name }}): object {
 
 function serialize{{ iface.name }}(item: {{ iface.name }}): object {
 {% for prop in iface.properties %}
-{% if prop.ir_type == "array" and prop.item_kind == "interface" %}
+{% if prop.ir_type == "flags" %}
+    var flags: any = {};
+{% for flag in enums[prop.flag_union] %}
+    flags["{{ flag }}"] = item.getFlag("{{ flag }}");
+{% endfor %}
+{% elif prop.ir_type == "array" and prop.item_kind == "interface" %}
     var {{ prop.name }}: object[] = [];
     for (var i_{{ prop.name }} = 0; i_{{ prop.name }} < item.{{ prop.name }}.length; i_{{ prop.name }}++) {
         {{ prop.name }}.push(serialize{{ prop.item_type }}(item.{{ prop.name }}[i_{{ prop.name }}]));
@@ -148,13 +189,27 @@ function get{{ ns.name | pascal }}(): object {
 }
 {% endfor %}
 
+// ── Entity collection getters ────────────────────────────────────────────────
+{% for ec in entity_collections %}
+
+function get{{ ec.name | pascal }}(): object[] {
+    var items = {{ ec.access }};
+    var result: object[] = [];
+    for (var i = 0; i < items.length; i++) {
+        result.push(serialize{{ ec.ts_interface }}(items[i] as {{ ec.ts_interface }}));
+    }
+    return result;
+}
+{% endfor %}
+
 // ── Router ────────────────────────────────────────────────────────────────────
 
 /**
  * Handle state query endpoints.
  *
  * Returns true if the endpoint was handled, false otherwise.
- * Endpoints: one per namespace root + one per property sub-path.
+ * Endpoints: one per namespace root + one per property sub-path,
+ * plus one per entity collection.
  */
 export function handleQuery(endpoint: string, params: any, reply: (response: object) => void): boolean {
     switch (endpoint) {
@@ -177,6 +232,11 @@ export function handleQuery(endpoint: string, params: any, reply: (response: obj
 {% endif %}
             return true;
 {% endfor %}
+{% endfor %}
+{% for ec in entity_collections %}
+        case "{{ ec.name }}":
+            reply({ success: true, payload: get{{ ec.name | pascal }}() });
+            return true;
 {% endfor %}
         default:
             return false;
