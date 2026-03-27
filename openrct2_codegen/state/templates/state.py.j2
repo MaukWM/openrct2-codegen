@@ -108,7 +108,7 @@ class StateProxy:
 {% if ec.is_union %}
 
     def {{ ec.name }}(self) -> list[{{ ec.ts_interface }}]:
-        _adapter = TypeAdapter({{ ec.ts_interface }})
+        _adapter: TypeAdapter[{{ ec.ts_interface }}] = TypeAdapter({{ ec.ts_interface }})
         return [_adapter.validate_python(x) for x in self._query("{{ ec.name }}")]
 {% else %}
 
