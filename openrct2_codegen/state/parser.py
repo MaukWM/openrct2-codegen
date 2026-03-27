@@ -84,9 +84,13 @@ _LITERAL_FIELD_RE = re.compile(
 
 # ── Interface body extraction ─────────────────────────────────────────
 
+# interface Foo extends Bar {
+_EXTENDS_RE = re.compile(r'\binterface\s+(\w+)\s+extends\s+(\w+)\s*\{')
+
+
 def _extract_interface_body(text: str, name: str) -> str | None:
     """Return the body text of `interface <name> { ... }` (without braces)."""
-    pattern = re.compile(r'\binterface\s+' + re.escape(name) + r'\s*\{')
+    pattern = re.compile(r'\binterface\s+' + re.escape(name) + r'(?:\s+extends\s+\w+)?\s*\{')
     match = pattern.search(text)
     if not match:
         return None
@@ -102,6 +106,30 @@ def _extract_interface_body(text: str, name: str) -> str | None:
         i += 1
 
     return text[start:i - 1]
+
+
+def _get_parent(text: str, name: str) -> str | None:
+    """Return the parent interface name if `interface <name> extends <parent>`, else None."""
+    pattern = re.compile(r'\binterface\s+' + re.escape(name) + r'\s+extends\s+(\w+)\s*\{')
+    match = pattern.search(text)
+    return match.group(1) if match else None
+
+
+def _get_inheritance_chain(text: str, name: str) -> list[str]:
+    """Return the full inheritance chain, from most-ancestral to the named interface.
+
+    e.g. _get_inheritance_chain(text, "Guest") → ["Entity", "Peep", "Guest"]
+    """
+    chain = [name]
+    current = name
+    while True:
+        parent = _get_parent(text, current)
+        if parent is None:
+            break
+        chain.append(parent)
+        current = parent
+    chain.reverse()
+    return chain
 
 
 # ── Discriminator detection ───────────────────────────────────────────
@@ -291,6 +319,38 @@ def _parse_interface(
             known_interfaces, known_enums,
             interface_unions, union_discriminators,
         ))
+
+    return Interface(name=name, properties=properties)
+
+
+def _parse_interface_flattened(
+    text: str,
+    name: str,
+    known_interfaces: set[str],
+    known_enums: set[str],
+    interface_unions: dict[str, list[str]],
+    union_discriminators: dict[str, str | None],
+) -> Interface | None:
+    """Parse an interface with all inherited properties flattened in.
+
+    Walks the extends chain (e.g. Guest → Peep → Entity) and concatenates
+    properties from ancestors first, then the interface's own properties.
+    """
+    chain = _get_inheritance_chain(text, name)
+    properties = []
+    seen_names: set[str] = set()
+
+    for iface_name in chain:
+        parsed = _parse_interface(
+            text, iface_name, known_interfaces, known_enums,
+            interface_unions, union_discriminators,
+        )
+        if parsed is None:
+            return None
+        for prop in parsed.properties:
+            if prop.name not in seen_names:
+                properties.append(prop)
+                seen_names.add(prop.name)
 
     return Interface(name=name, properties=properties)
 
