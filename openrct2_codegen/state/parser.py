@@ -10,6 +10,7 @@ from pathlib import Path
 from openrct2_codegen.actions.parser import parse_plugin_api_version
 from openrct2_codegen.state.ir import (
     ArrayProperty,
+    EntityCollection,
     EnumRefProperty,
     FlagsProperty,
     Interface,
@@ -31,12 +32,22 @@ _NAMESPACES: list[Namespace] = [
     Namespace(name="climate",  ts_interface="Climate"),
 ]
 
+# ── Entity collections to include ────────────────────────────────────
+# Arrays of game entities accessed via map properties or getAllEntities().
+# Interfaces are parsed with inheritance flattening.
+
+_ENTITY_COLLECTIONS: list[EntityCollection] = [
+    EntityCollection(name="rides",  access="map.rides",                    ts_interface="Ride"),
+    EntityCollection(name="staff",  access='map.getAllEntities("staff")',   ts_interface="Staff", is_union=True),
+    EntityCollection(name="guests", access='map.getAllEntities("guest")',   ts_interface="Guest"),
+]
+
 _PRIMITIVES = {"number", "boolean", "string"}
 
 # ── Regex patterns ────────────────────────────────────────────────────
 
-# interface Foo {
-_INTERFACE_RE = re.compile(r'\binterface\s+(\w+)\s*\{')
+# interface Foo { OR interface Foo extends Bar {
+_INTERFACE_RE = re.compile(r'\binterface\s+(\w+)(?:\s+extends\s+\w+)?\s*\{')
 
 # type Foo = "a" | "b" | "c";  — pure string literal union
 _STRING_UNION_RE = re.compile(
@@ -247,6 +258,8 @@ def _resolve_property(
                 ir_type="array", name=name, ts_type=raw_type.strip(),
                 item_type=item, item_kind="enum",
             )
+        if item in _PRIMITIVES:
+            return ScalarProperty(ir_type="scalar", name=name, ts_type=raw_type.strip(), optional=optional)
         return ArrayProperty(
             ir_type="array", name=name, ts_type=raw_type.strip(),
             item_type=item, item_kind="interface",
@@ -437,6 +450,42 @@ def parse_state(dts_path: Path, openrct2_version: str, source_root: Path) -> Sta
         interface_unions, union_discriminators,
     )
 
+    # Pass 3: parse entity collection interfaces (with inheritance flattening)
+    for ec in _ENTITY_COLLECTIONS:
+        if ec.is_union:
+            # Union type (e.g. Staff = Handyman | Mechanic | ...) —
+            # parse each variant with flattening
+            variants = interface_unions.get(ec.ts_interface, [])
+            for variant in variants:
+                if variant not in interfaces:
+                    iface = _parse_interface_flattened(
+                        text, variant, known_interfaces, known_enums,
+                        interface_unions, union_discriminators,
+                    )
+                    if iface is None:
+                        raise ValueError(f"Entity variant '{variant}' not found in .d.ts")
+                    interfaces[iface.name] = iface
+        else:
+            # Concrete type (e.g. Ride, Guest) — parse with flattening
+            if ec.ts_interface not in interfaces:
+                iface = _parse_interface_flattened(
+                    text, ec.ts_interface, known_interfaces, known_enums,
+                    interface_unions, union_discriminators,
+                )
+                if iface is None:
+                    raise ValueError(f"Entity interface '{ec.ts_interface}' not found in .d.ts")
+                interfaces[iface.name] = iface
+
+        # Collect nested interfaces referenced by entity properties
+        entity_roots = [ec.ts_interface] if not ec.is_union else interface_unions.get(ec.ts_interface, [])
+        nested = _collect_interfaces(
+            text, entity_roots, known_interfaces, known_enums,
+            interface_unions, union_discriminators,
+        )
+        for k, v in nested.items():
+            if k not in interfaces:
+                interfaces[k] = v
+
     # Trim enums to only those actually referenced in the collected interfaces
     referenced_enums: set[str] = set()
     for iface in interfaces.values():
@@ -455,6 +504,10 @@ def parse_state(dts_path: Path, openrct2_version: str, source_root: Path) -> Sta
         for prop in iface.properties:
             if prop.ir_type == "union":
                 referenced_unions.add(prop.union_name)
+    # Also include unions used by entity collections
+    for ec in _ENTITY_COLLECTIONS:
+        if ec.is_union:
+            referenced_unions.add(ec.ts_interface)
     interface_unions = {k: v for k, v in interface_unions.items() if k in referenced_unions}
 
     api_version = parse_plugin_api_version(source_root)
@@ -465,6 +518,7 @@ def parse_state(dts_path: Path, openrct2_version: str, source_root: Path) -> Sta
         generated_at=datetime.now(timezone.utc).isoformat(),
         generator_version=pkg_version("openrct2-codegen"),
         namespaces=_NAMESPACES,
+        entity_collections=_ENTITY_COLLECTIONS,
         interfaces=interfaces,
         enums=enums,
         interface_unions=interface_unions,

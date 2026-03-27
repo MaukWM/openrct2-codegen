@@ -103,6 +103,21 @@ class Namespace(BaseModel):
     ts_interface: str    # interface it implements: "Park", "Cheats", "GameDate"
 
 
+# ── Entity Collection ─────────────────────────────────────────────────
+
+class EntityCollection(BaseModel):
+    """An array of game entities accessed via map.rides or map.getAllEntities().
+
+    Unlike Namespaces (scalar global variables), entity collections are arrays
+    of objects that need to be iterated and serialized individually.
+    """
+
+    name: str              # endpoint name: "rides", "staff", "guests"
+    access: str            # JS access expression: "map.rides", 'map.getAllEntities("staff")'
+    ts_interface: str      # root interface: "Ride", "Guest", or union type alias: "Staff"
+    is_union: bool = False # True when ts_interface is a union (e.g. Staff = Handyman | Mechanic | ...)
+
+
 # ── Top-level IR ──────────────────────────────────────────────────────
 
 class StateIR(BaseModel):
@@ -113,6 +128,7 @@ class StateIR(BaseModel):
     generated_at: str
     generator_version: str
     namespaces: list[Namespace]
+    entity_collections: list[EntityCollection]
     interfaces: dict[str, Interface]        # keyed by interface name
     enums: dict[str, list[str]]             # string union types → list of values
     interface_unions: dict[str, list[str]]  # e.g. "ResearchItem" → ["RideResearchItem", "SceneryResearchItem"]
