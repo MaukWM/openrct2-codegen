@@ -4,15 +4,44 @@
 #
 # DO NOT EDIT -- regenerate with: openrct2-codegen render --template state.py
 
+from __future__ import annotations
+
 from typing import Annotated, Any, Literal, Union
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, TypeAdapter
 
 # API version this file was generated against.
 GENERATED_API_VERSION: int = {{ api_version }}
 
-# ── Union variant models ──────────────────────────────────────────────────────
-{% for iface in union_variants %}
+# ── Flags models ──────────────────────────────────────────────────────────────
+{% set flags_done = [] %}
+{% for ns in namespaces %}
+{% for prop in ns.properties %}
+{% if prop.ir_type == "flags" and prop.flag_union not in flags_done %}
+
+class {{ prop.flag_union }}(BaseModel):
+{% for flag in enums[prop.flag_union] %}
+    {{ flag }}: bool
+{% endfor %}
+{% set _ = flags_done.append(prop.flag_union) %}
+{% endif %}
+{% endfor %}
+{% endfor %}
+{% for iface in union_variants + other_leaves %}
+{% for prop in iface.properties %}
+{% if prop.ir_type == "flags" and prop.flag_union not in flags_done %}
+
+class {{ prop.flag_union }}(BaseModel):
+{% for flag in enums[prop.flag_union] %}
+    {{ flag }}: bool
+{% endfor %}
+{% set _ = flags_done.append(prop.flag_union) %}
+{% endif %}
+{% endfor %}
+{% endfor %}
+
+# ── Models (topologically sorted) ─────────────────────────────────────────────
+{% for iface in all_models %}
 
 class {{ iface.name }}(BaseModel):
 {% for prop in iface.properties %}
@@ -27,28 +56,6 @@ class {{ iface.name }}(BaseModel):
     Union[{% for v in union_info.variants %}{{ v.name }}{% if not loop.last %}, {% endif %}{% endfor %}],
     Field(discriminator="{{ union_info.discriminator }}"),
 ]
-{% endfor %}
-
-# ── Leaf models ───────────────────────────────────────────────────────────────
-{% for iface in other_leaves %}
-
-class {{ iface.name }}(BaseModel):
-{% for prop in iface.properties %}
-    {{ prop.name }}: {{ prop | py_type }}
-{% endfor %}
-{% endfor %}
-
-# ── Flags models ──────────────────────────────────────────────────────────────
-{% for ns in namespaces %}
-{% for prop in ns.properties %}
-{% if prop.ir_type == "flags" %}
-
-class {{ prop.flag_union }}(BaseModel):
-{% for flag in enums[prop.flag_union] %}
-    {{ flag }}: bool
-{% endfor %}
-{% endif %}
-{% endfor %}
 {% endfor %}
 
 # ── Namespace models ──────────────────────────────────────────────────────────
@@ -96,4 +103,16 @@ class StateProxy:
         return {{ prop.union_name }}.model_validate(raw)
 {% endif %}
 {% endfor %}
+{% endfor %}
+{% for ec in entity_collections %}
+{% if ec.is_union %}
+
+    def {{ ec.name }}(self) -> list[{{ ec.ts_interface }}]:
+        _adapter = TypeAdapter({{ ec.ts_interface }})
+        return [_adapter.validate_python(x) for x in self._query("{{ ec.name }}")]
+{% else %}
+
+    def {{ ec.name }}(self) -> list[{{ ec.ts_interface }}]:
+        return [{{ ec.ts_interface }}.model_validate(x) for x in self._query("{{ ec.name }}")]
+{% endif %}
 {% endfor %}

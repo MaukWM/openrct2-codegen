@@ -106,6 +106,36 @@ def _enrich_unions(interfaces, interface_unions):
     return enriched
 
 
+def _topo_sort_interfaces(names: list[str], interfaces: dict[str, object]) -> list[str]:
+    """Topologically sort interface names so dependencies come first."""
+    def _deps(iface) -> set[str]:
+        deps: set[str] = set()
+        for p in iface.properties:
+            if p.ir_type == "interface":
+                deps.add(p.interface)
+            elif p.ir_type == "array" and p.item_kind == "interface":
+                deps.add(p.item_type)
+        return deps
+
+    name_set = set(names)
+    visited: set[str] = set()
+    result: list[str] = []
+
+    def visit(name: str) -> None:
+        if name in visited or name not in name_set:
+            return
+        visited.add(name)
+        iface = interfaces.get(name)
+        if iface:
+            for dep in _deps(iface):
+                visit(dep)
+        result.append(name)
+
+    for name in names:
+        visit(name)
+    return result
+
+
 def render_template(template_name: str, ir: StateIR) -> str:
     """Render a state codegen template with the given IR."""
     j2_file = _TEMPLATES_DIR / f"{template_name}.j2"
@@ -115,18 +145,13 @@ def render_template(template_name: str, ir: StateIR) -> str:
     namespace_iface_names = {ns.ts_interface for ns in ir.namespaces}
     union_variant_names = {v for variants in ir.interface_unions.values() for v in variants}
 
-    # Union variant interfaces come first so serializers are defined before the union serializer
-    union_variants = [
-        ir.interfaces[n].model_dump()
-        for n in ir.interfaces
-        if n not in namespace_iface_names and n in union_variant_names
-    ]
-    # All other leaf interfaces (Research, WeatherState, ScenarioObjective, Award, ParkMessage, …)
-    other_leaves = [
-        ir.interfaces[n].model_dump()
-        for n in ir.interfaces
-        if n not in namespace_iface_names and n not in union_variant_names
-    ]
+    # All non-namespace interfaces, topologically sorted so dependencies come first
+    all_model_names = [n for n in ir.interfaces if n not in namespace_iface_names]
+    all_model_names = _topo_sort_interfaces(all_model_names, ir.interfaces)
+
+    # Split into union variants and other leaves (preserving topo order)
+    union_variants = [ir.interfaces[n].model_dump() for n in all_model_names if n in union_variant_names]
+    other_leaves = [ir.interfaces[n].model_dump() for n in all_model_names if n not in union_variant_names]
 
     enriched_unions = _enrich_unions(ir.interfaces, ir.interface_unions)
 
@@ -151,6 +176,9 @@ def render_template(template_name: str, ir: StateIR) -> str:
     env = make_env(_TEMPLATES_DIR, {"pascal": _pascal, "camel_to_snake": _camel_to_snake, "py_type": _py_type})
     template = env.get_template(j2_file.name)
 
+    # For Python: all models in topo order (union variants interleaved with leaves)
+    all_models = [ir.interfaces[n].model_dump() for n in all_model_names]
+
     return template.render(
         generator_version=ir.generator_version,
         openrct2_version=ir.openrct2_version,
@@ -163,4 +191,5 @@ def render_template(template_name: str, ir: StateIR) -> str:
         unions=enriched_unions,
         union_variants=union_variants,
         other_leaves=other_leaves,
+        all_models=all_models,
     )
