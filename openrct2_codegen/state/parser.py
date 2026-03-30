@@ -409,7 +409,7 @@ def _collect_interfaces(
         if name in result:
             continue
 
-        iface = _parse_interface(text, name, known_interfaces, known_enums, interface_unions, union_discriminators)
+        iface = _parse_interface_flattened(text, name, known_interfaces, known_enums, interface_unions, union_discriminators)
         if iface is None:
             raise ValueError(f"Interface '{name}' not found in .d.ts — IR is incomplete")
 
