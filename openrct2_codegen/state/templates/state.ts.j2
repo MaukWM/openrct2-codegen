@@ -58,7 +58,7 @@ function serialize{{ iface.name }}(item: {{ iface.name }}): object {
 {% for union_name, union_info in unions.items() %}
 {% set disc = union_info.discriminator %}
 
-function serialize{{ union_name }}(item: {{ union_name }}): object {
+export function serialize{{ union_name }}(item: {{ union_name }}): object {
 {% for variant in union_info.variants %}
 {% if loop.first %}
     if (item.{{ disc }} === "{{ variant.discriminator_value }}") {
