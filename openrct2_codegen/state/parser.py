@@ -42,6 +42,28 @@ _ENTITY_COLLECTIONS: list[EntityCollection] = [
     EntityCollection(name="guests", access='map.getAllEntities("guest")',   ts_interface="Guest"),
 ]
 
+# ── Standalone flattened interfaces ──────────────────────────────────
+# TileElement variants (SurfaceElement, FootpathElement, etc.) from:
+# https://github.com/OpenRCT2/OpenRCT2/blob/develop/distribution/openrct2.d.ts
+#
+# These extend BaseTileElement and form the TileElement discriminated union.
+# They're not a namespace (like park/cheats) or an entity collection
+# (like rides/staff) — nothing in the plugin API exposes them as a
+# top-level array.  Instead, they live inside Tile.elements which is
+# accessed via map.getTile(x, y).  The bridge's hand-written get_tile
+# endpoint uses the generated serializers to send them over TCP.
+
+_STANDALONE_FLATTENED: list[str] = [
+    "SurfaceElement",
+    "FootpathElement",
+    "TrackElement",
+    "SmallSceneryElement",
+    "WallElement",
+    "EntranceElement",
+    "LargeSceneryElement",
+    "BannerElement",
+]
+
 _PRIMITIVES = {"number", "boolean", "string"}
 
 # ── Regex patterns ────────────────────────────────────────────────────
@@ -499,6 +521,17 @@ def parse_state(dts_path: Path, openrct2_version: str, source_root: Path) -> Sta
                 if k not in interfaces:
                     interfaces[k] = v
 
+    # Pass 3b: parse standalone flattened interfaces (e.g. tile elements)
+    for iface_name in _STANDALONE_FLATTENED:
+        if iface_name not in interfaces:
+            iface = _parse_interface_flattened(
+                text, iface_name, known_interfaces, known_enums,
+                interface_unions, union_discriminators,
+            )
+            if iface is None:
+                raise ValueError(f"Standalone interface '{iface_name}' not found in .d.ts")
+            interfaces[iface.name] = iface
+
     # Trim enums to only those actually referenced in the collected interfaces
     referenced_enums: set[str] = set()
     for iface in interfaces.values():
@@ -521,6 +554,11 @@ def parse_state(dts_path: Path, openrct2_version: str, source_root: Path) -> Sta
     for ec in _ENTITY_COLLECTIONS:
         if ec.is_union:
             referenced_unions.add(ec.ts_interface)
+    # Include unions whose variants are all in standalone flattened set
+    standalone_set = set(_STANDALONE_FLATTENED)
+    for union_name, variants in list(interface_unions.items()):
+        if all(v in standalone_set for v in variants):
+            referenced_unions.add(union_name)
     interface_unions = {k: v for k, v in interface_unions.items() if k in referenced_unions}
 
     api_version = parse_plugin_api_version(source_root)
