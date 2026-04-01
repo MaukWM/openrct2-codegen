@@ -12,7 +12,13 @@ from openrct2_codegen.actions.ir import ActionsIR, enrich_enum_types
 from openrct2_codegen.actions.parser import parse_actions
 from openrct2_codegen.enums.ir import EnumsIR
 from openrct2_codegen.enums.parser import parse_enums
-from openrct2_codegen.source import get_dts_path, get_source
+from openrct2_codegen.objects.parser import parse_objects
+from openrct2_codegen.source import (
+    get_dts_path,
+    get_objects_source,
+    get_pinned_objects_version,
+    get_source,
+)
 from openrct2_codegen.state.ir import StateIR
 from openrct2_codegen.state.parser import parse_state
 
@@ -20,6 +26,7 @@ from openrct2_codegen.state.parser import parse_state
 _DEFAULT_ACTIONS_IR = Path("generated/actions.json")
 _DEFAULT_STATE_IR = Path("generated/state.json")
 _DEFAULT_ENUMS_IR = Path("generated/enums.json")
+_DEFAULT_OBJECTS_IR = Path("generated/objects.json")
 
 
 @click.group()
@@ -61,6 +68,13 @@ def main() -> None:
     show_default=True,
     help="Output path for enums.json IR.",
 )
+@click.option(
+    "--objects-out",
+    type=click.Path(path_type=Path),
+    default=_DEFAULT_OBJECTS_IR,
+    show_default=True,
+    help="Output path for objects.json IR.",
+)
 @click.option("--verbose", is_flag=True, help="Show detailed progress.")
 def generate(
     openrct2_version: str | None,
@@ -68,9 +82,10 @@ def generate(
     actions_out: Path,
     state_out: Path,
     enums_out: Path,
+    objects_out: Path,
     verbose: bool,
 ) -> None:
-    """Generate actions.json, state.json, and enums.json IRs from OpenRCT2 source."""
+    """Generate actions.json, state.json, enums.json, and objects.json IRs from OpenRCT2 source."""
     source_root = get_source(version=openrct2_version, local_path=openrct2_source)
     version = openrct2_version or source_root.name
 
@@ -95,9 +110,24 @@ def generate(
     # State IR
     dts_path = get_dts_path(source_root)
     state_ir = parse_state(dts_path, openrct2_version=version, source_root=source_root)
-    click.echo(f"Parsed {len(state_ir.interfaces)} interfaces, {len(state_ir.enums)} enums")
+    click.echo(
+        f"Parsed {len(state_ir.interfaces)} interfaces, {len(state_ir.enums)} enums"
+    )
     state_out.write_text(state_ir.model_dump_json(indent=2))
     click.echo(f"state.json  → {state_out}")
+
+    # Objects IR (ride object catalog + flat ride footprints)
+    objects_out.parent.mkdir(parents=True, exist_ok=True)
+    obj_version = get_pinned_objects_version(source_root)
+    click.echo(f"Objects version pinned by assets.json: {obj_version}")
+    objects_root = get_objects_source(obj_version)
+    objects_ir = parse_objects(source_root, objects_root, version=version)
+    click.echo(
+        f"Parsed {len(objects_ir.ride_objects)} ride objects, "
+        f"{len(objects_ir.ride_type_descriptors)} ride type descriptors"
+    )
+    objects_out.write_text(objects_ir.model_dump_json(indent=2))
+    click.echo(f"objects.json → {objects_out}")
 
 
 _ACTIONS_TEMPLATES = {"actions.ts", "actions.py"}
@@ -139,19 +169,25 @@ def render(
     if template in _ENUMS_TEMPLATES:
         ir = ir or _DEFAULT_ENUMS_IR
         if not ir.exists():
-            raise click.ClickException(f"IR file not found: {ir} — run 'generate' first.")
+            raise click.ClickException(
+                f"IR file not found: {ir} — run 'generate' first."
+            )
         enums_ir = EnumsIR.model_validate_json(ir.read_text())
         rendered = enums_codegen.render_template(template, enums_ir)
     elif template in _STATE_TEMPLATES:
         ir = ir or _DEFAULT_STATE_IR
         if not ir.exists():
-            raise click.ClickException(f"IR file not found: {ir} — run 'generate' first.")
+            raise click.ClickException(
+                f"IR file not found: {ir} — run 'generate' first."
+            )
         state_ir = StateIR.model_validate_json(ir.read_text())
         rendered = state_codegen.render_template(template, state_ir)
     else:
         ir = ir or _DEFAULT_ACTIONS_IR
         if not ir.exists():
-            raise click.ClickException(f"IR file not found: {ir} — run 'generate' first.")
+            raise click.ClickException(
+                f"IR file not found: {ir} — run 'generate' first."
+            )
         actions_ir = ActionsIR.model_validate_json(ir.read_text())
         rendered = actions_codegen.render_template(template, actions_ir)
 
