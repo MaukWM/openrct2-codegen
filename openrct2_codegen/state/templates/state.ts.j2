@@ -37,7 +37,11 @@ function serialize{{ iface.name }}(item: {{ iface.name }}): object {
         {{ prop.name }}: item.{{ prop.name }},
 {% endif %}
 {% elif prop.ir_type == "interface" %}
+{% if prop.optional %}
+        {{ prop.name }}: item.{{ prop.name }} != null ? serialize{{ prop.interface }}(item.{{ prop.name }}) : null,
+{% else %}
         {{ prop.name }}: serialize{{ prop.interface }}(item.{{ prop.name }}),
+{% endif %}
 {% elif prop.ir_type == "flags" %}
         flags: flags,
 {% elif prop.ir_type == "array" and prop.item_kind == "interface" %}
@@ -104,7 +108,11 @@ function serialize{{ iface.name }}(item: {{ iface.name }}): object {
         {{ prop.name }}: item.{{ prop.name }},
 {% endif %}
 {% elif prop.ir_type == "interface" %}
+{% if prop.optional %}
+        {{ prop.name }}: item.{{ prop.name }} != null ? serialize{{ prop.interface }}(item.{{ prop.name }}) : null,
+{% else %}
         {{ prop.name }}: serialize{{ prop.interface }}(item.{{ prop.name }}),
+{% endif %}
 {% elif prop.ir_type == "flags" %}
         flags: flags,
 {% elif prop.ir_type == "array" and prop.item_kind == "interface" %}

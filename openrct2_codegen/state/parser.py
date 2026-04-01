@@ -66,6 +66,24 @@ _STANDALONE_FLATTENED: list[str] = [
 
 _PRIMITIVES = {"number", "boolean", "string"}
 
+# ── d.ts nullability overrides ───────────────────────────────────────
+# Fields that are typed as non-nullable in the d.ts but are null at runtime.
+# Maps "InterfaceName.fieldName" → True (force optional).
+# See docs/openrct2-api-bugs.md for details on each.
+
+_FORCE_OPTIONAL: set[str] = {
+    # Bug #1: ScenarioObjective fields omitted based on objective type
+    "ScenarioObjective.guests",
+    "ScenarioObjective.year",
+    "ScenarioObjective.length",
+    "ScenarioObjective.excitement",
+    "ScenarioObjective.parkValue",
+    "ScenarioObjective.monthlyIncome",
+    # Bug #7: RideStation.entrance/exit null for stalls
+    "RideStation.entrance",
+    "RideStation.exit",
+}
+
 # ── Regex patterns ────────────────────────────────────────────────────
 
 # interface Foo { OR interface Foo extends Bar {
@@ -348,6 +366,10 @@ def _parse_interface(
         # Skip if this line is actually a method (has `(` in the matched region)
         if "(" in raw_type:
             continue
+
+        # Apply d.ts nullability overrides (see docs/openrct2-api-bugs.md)
+        if f"{name}.{prop_name}" in _FORCE_OPTIONAL:
+            optional = True
 
         properties.append(_resolve_property(
             prop_name, optional, raw_type,
