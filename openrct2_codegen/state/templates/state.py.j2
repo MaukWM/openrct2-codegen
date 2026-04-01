@@ -45,7 +45,11 @@ class {{ prop.flag_union }}(BaseModel):
 
 class {{ iface.name }}(BaseModel):
 {% for prop in iface.properties %}
+{% if prop.optional | default(false) %}
+    {{ prop.name }}: {{ prop | py_type }} = None
+{% else %}
     {{ prop.name }}: {{ prop | py_type }}
+{% endif %}
 {% endfor %}
 {% endfor %}
 

@@ -79,9 +79,14 @@ _FORCE_OPTIONAL: set[str] = {
     "ScenarioObjective.excitement",
     "ScenarioObjective.parkValue",
     "ScenarioObjective.monthlyIncome",
-    # Bug #7: RideStation.entrance/exit null for stalls
+    # Bug #7: RideStation fields null for stalls (no station)
+    "RideStation.start",
     "RideStation.entrance",
     "RideStation.exit",
+    # Bug #7 (cont): Ride.value null for unrated rides/stalls
+    "Ride.value",
+    # Bug #7 (cont): InstalledObject.version absent for RCT2-era objects
+    "InstalledObject.version",
 }
 
 # ── Regex patterns ────────────────────────────────────────────────────
