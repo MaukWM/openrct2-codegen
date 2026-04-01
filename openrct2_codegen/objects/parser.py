@@ -54,6 +54,7 @@ def parse_objects(
     objects_root: Path,
     version: str,
     objects_version: str,
+    track_elem_values: dict[str, int],
 ) -> ObjectsIR:
     """Parse all objects and ride type descriptors into the objects IR.
 
@@ -62,9 +63,11 @@ def parse_objects(
         objects_root: Path to OpenRCT2 objects repo root (for object JSON files).
         version: OpenRCT2 version string.
         objects_version: OpenRCT2/objects repo version string.
+        track_elem_values: TrackElemType enum name → int value mapping
+            (from enums IR). Used to resolve track_elem_value on descriptors.
     """
     all_objects = _parse_all_objects(objects_root)
-    descriptors = _parse_rtd_footprints(source_root)
+    descriptors = _parse_rtd_footprints(source_root, track_elem_values)
 
     return ObjectsIR(
         openrct2_version=version,
@@ -166,7 +169,9 @@ def _parse_height_constants(source_root: Path) -> dict[str, int]:
     return constants
 
 
-def _parse_rtd_footprints(source_root: Path) -> dict[str, RideTypeDescriptor]:
+def _parse_rtd_footprints(
+    source_root: Path, track_elem_values: dict[str, int]
+) -> dict[str, RideTypeDescriptor]:
     """Parse RTD headers for flat ride footprints.
 
     Scans src/openrct2/ride/rtd/**/*.h for .Name and .StartTrackPiece fields.
@@ -218,8 +223,18 @@ def _parse_rtd_footprints(source_root: Path) -> dict[str, RideTypeDescriptor]:
             )
             continue
 
+        # Resolve TrackElemType int value
+        track_elem_value = track_elem_values.get(track_elem)
+        if track_elem_value is None:
+            print(
+                f"Warning: TrackElemType '{track_elem}' not found in enums "
+                f"for ride type '{ride_type_name}'"
+            )
+            continue
+
         footprints[ride_type_name] = RideTypeDescriptor(
             track_elem=track_elem,
+            track_elem_value=track_elem_value,
             tiles_x=tiles_x,
             tiles_y=tiles_y,
             clearance_height=clearance_height,

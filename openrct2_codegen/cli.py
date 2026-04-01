@@ -102,6 +102,9 @@ def generate(
     click.echo(f"enums.json  → {enums_out}")
 
     # Actions IR (enriched with enum types from enums IR)
+    # NOTE: Actions uses a post-parse enrichment pattern (parse → mutate IR).
+    # Objects below uses an inline pattern (pass data into parser).
+    # Inline is preferred — IR comes out complete. Actions predates this pattern.
     actions_ir = parse_actions(source_root, version=version)
     enrich_enum_types(actions_ir, set(enums_ir.enums.keys()))
     click.echo(f"Parsed {len(actions_ir.actions)} actions")
@@ -118,12 +121,20 @@ def generate(
     click.echo(f"state.json  → {state_out}")
 
     # Objects IR (ride object catalog + flat ride footprints)
+    # Enum data passed into the parser so the IR is complete at parse time.
     objects_out.parent.mkdir(parents=True, exist_ok=True)
     obj_version = get_pinned_objects_version(source_root)
     click.echo(f"Objects version pinned by assets.json: {obj_version}")
     objects_root = get_objects_source(obj_version)
+    track_elem_values = {
+        v.name: v.value for v in enums_ir.enums["TrackElemType"].values
+    }
     objects_ir = parse_objects(
-        source_root, objects_root, version=version, objects_version=obj_version
+        source_root,
+        objects_root,
+        version=version,
+        objects_version=obj_version,
+        track_elem_values=track_elem_values,
     )
     click.echo(
         f"Parsed {len(objects_ir.objects)} objects, "

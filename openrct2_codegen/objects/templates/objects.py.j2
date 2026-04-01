@@ -99,7 +99,7 @@ _BY_IDENTIFIER: dict[str, RideObjectInfo] = {
     {% endfor %}
 }
 
-# Ride type → track element name for flat rides.
+# Ride type → TrackElemType integer value for flat rides.
 # Derived from C++ RideTypeDescriptor.StartTrackPiece in the RTD headers.
 #
 # Each flat ride type has a specific track piece that determines:
@@ -111,9 +111,9 @@ _BY_IDENTIFIER: dict[str, RideObjectInfo] = {
 # results in invisible rides with no footprint.
 #
 # Only flat ride types are included — tracked rides (coasters, water rides)
-# use END_STATION for their station pieces, which is handled separately.
-RIDE_TYPE_TRACK_ELEMS: dict[str, str] = {
+# are not flat rides and cannot be placed with place_flat_ride().
+RIDE_TYPE_TRACK_ELEMS: dict[str, int] = {
     {% for ride_type, desc in descriptors.items() %}
-    "{{ ride_type }}": "{{ desc.track_elem }}",
+    "{{ ride_type }}": {{ desc.track_elem_value }},  # {{ desc.track_elem }}
     {% endfor %}
 }

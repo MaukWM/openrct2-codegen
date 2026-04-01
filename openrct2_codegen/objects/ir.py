@@ -32,11 +32,10 @@ class RideTypeDescriptor(BaseModel):
     """
 
     track_elem: str  # e.g. "flatTrack3x3" (TrackElemType name)
+    track_elem_value: int  # resolved TrackElemType enum integer, e.g. 266
     tiles_x: int  # footprint width in tiles, e.g. 3
     tiles_y: int  # footprint depth in tiles, e.g. 3
-    clearance_height: (
-        int  # vertical clearance in z-units (from RideHeights.ClearanceHeight)
-    )
+    clearance_height: int  # vertical clearance in z-units (from RideHeights.ClearanceHeight)
 
 
 class ObjectsIR(BaseModel):
