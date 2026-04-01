@@ -49,6 +49,7 @@ def parse_objects(
     source_root: Path,
     objects_root: Path,
     version: str,
+    objects_version: str,
 ) -> ObjectsIR:
     """Parse ride objects and footprints into the objects IR.
 
@@ -56,16 +57,18 @@ def parse_objects(
         source_root: Path to OpenRCT2 C++ source (for RTD headers).
         objects_root: Path to OpenRCT2 objects repo root (for ride JSON files).
         version: OpenRCT2 version string.
+        objects_version: OpenRCT2/objects repo version string.
     """
     ride_objects = _parse_ride_object_jsons(objects_root)
-    footprints = _parse_rtd_footprints(source_root)
+    descriptors = _parse_rtd_footprints(source_root)
 
     return ObjectsIR(
         openrct2_version=version,
+        objects_version=objects_version,
         generated_at=datetime.now(timezone.utc).isoformat(),
         generator_version=pkg_version("openrct2-codegen"),
         ride_objects=ride_objects,
-        ride_type_descriptors=footprints,
+        ride_type_descriptors=descriptors,
     )
 
 

@@ -34,6 +34,7 @@ class ObjectsIR(BaseModel):
     """Top-level IR: the full objects.json schema."""
 
     openrct2_version: str
+    objects_version: str
     generated_at: str
     generator_version: str
     ride_objects: list[RideObjectDef]

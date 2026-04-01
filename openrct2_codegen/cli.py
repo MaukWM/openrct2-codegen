@@ -7,6 +7,7 @@ import click
 
 import openrct2_codegen.actions.codegen as actions_codegen
 import openrct2_codegen.enums.codegen as enums_codegen
+import openrct2_codegen.objects.codegen as objects_codegen
 import openrct2_codegen.state.codegen as state_codegen
 from openrct2_codegen.actions.ir import ActionsIR, enrich_enum_types
 from openrct2_codegen.actions.parser import parse_actions
@@ -121,7 +122,9 @@ def generate(
     obj_version = get_pinned_objects_version(source_root)
     click.echo(f"Objects version pinned by assets.json: {obj_version}")
     objects_root = get_objects_source(obj_version)
-    objects_ir = parse_objects(source_root, objects_root, version=version)
+    objects_ir = parse_objects(
+        source_root, objects_root, version=version, objects_version=obj_version
+    )
     click.echo(
         f"Parsed {len(objects_ir.ride_objects)} ride objects, "
         f"{len(objects_ir.ride_type_descriptors)} ride type descriptors"
@@ -133,12 +136,20 @@ def generate(
 _ACTIONS_TEMPLATES = {"actions.ts", "actions.py"}
 _STATE_TEMPLATES = {"state.ts", "state.py"}
 _ENUMS_TEMPLATES = {"enums.py"}
+_OBJECTS_TEMPLATES = {"objects.py"}
 
 
 @main.command()
 @click.option(
     "--template",
-    type=click.Choice(sorted(_ACTIONS_TEMPLATES | _STATE_TEMPLATES | _ENUMS_TEMPLATES)),
+    type=click.Choice(
+        sorted(
+            _ACTIONS_TEMPLATES
+            | _STATE_TEMPLATES
+            | _ENUMS_TEMPLATES
+            | _OBJECTS_TEMPLATES
+        )
+    ),
     required=True,
     help="Template to render.",
 )
@@ -148,7 +159,8 @@ _ENUMS_TEMPLATES = {"enums.py"}
     default=None,
     help=(
         f"Path to IR file. Defaults to {_DEFAULT_ACTIONS_IR} for actions templates, "
-        f"{_DEFAULT_STATE_IR} for state templates, {_DEFAULT_ENUMS_IR} for enums templates."
+        f"{_DEFAULT_STATE_IR} for state templates, {_DEFAULT_ENUMS_IR} for enums templates, "
+        f"{_DEFAULT_OBJECTS_IR} for objects templates."
     ),
 )
 @click.option(
@@ -182,6 +194,16 @@ def render(
             )
         state_ir = StateIR.model_validate_json(ir.read_text())
         rendered = state_codegen.render_template(template, state_ir)
+    elif template in _OBJECTS_TEMPLATES:
+        ir = ir or _DEFAULT_OBJECTS_IR
+        if not ir.exists():
+            raise click.ClickException(
+                f"IR file not found: {ir} — run 'generate' first."
+            )
+        from openrct2_codegen.objects.ir import ObjectsIR
+
+        objects_ir = ObjectsIR.model_validate_json(ir.read_text())
+        rendered = objects_codegen.render_template(template, objects_ir)
     else:
         ir = ir or _DEFAULT_ACTIONS_IR
         if not ir.exists():
