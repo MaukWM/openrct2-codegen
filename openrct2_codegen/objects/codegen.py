@@ -13,7 +13,7 @@ _TEMPLATES_DIR = Path(__file__).parent / "templates"
 
 
 def _name_to_const(name: str) -> str:
-    """Convert a ride object name to a SCREAMING_SNAKE_CASE constant.
+    """Convert an object name to a SCREAMING_SNAKE_CASE constant.
 
     "Merry-Go-Round" → "MERRY_GO_ROUND"
     "3D Cinema" → "_3D_CINEMA"
@@ -31,8 +31,8 @@ def _name_to_const(name: str) -> str:
 
 
 @dataclass
-class _ObjectTemplateData:
-    """Pre-processed object data for the template."""
+class _RideObjectTemplateData:
+    """Pre-processed ride object data for the template."""
 
     const_name: str
     identifier: str
@@ -44,15 +44,26 @@ class _ObjectTemplateData:
     clearance_height: int | None
 
 
-def _prepare_objects(ir: ObjectsIR) -> list[_ObjectTemplateData]:
-    """Join ride objects with ride type descriptors and prepare template data."""
+def _prepare_ride_objects(ir: ObjectsIR) -> list[_RideObjectTemplateData]:
+    """Filter ride objects from the IR, join with descriptors, prepare template data."""
     descriptors = ir.ride_type_descriptors
-    results: list[_ObjectTemplateData] = []
+    results: list[_RideObjectTemplateData] = []
 
     # Track used const names to handle duplicates
     used_names: dict[str, int] = {}
 
-    for obj in ir.ride_objects:
+    for obj in ir.objects:
+        if obj.object_type != "ride":
+            continue
+
+        ride_type_raw = obj.properties.get("type")
+        if not ride_type_raw:
+            continue
+        # type can be a string or list in the source JSON
+        ride_type = (
+            ride_type_raw[0] if isinstance(ride_type_raw, list) else ride_type_raw
+        )
+
         const_name = _name_to_const(obj.name)
 
         # Handle duplicate names (e.g. two "Restroom" objects)
@@ -63,20 +74,18 @@ def _prepare_objects(ir: ObjectsIR) -> list[_ObjectTemplateData]:
             used_names[const_name] = 1
 
         # Join with descriptor for footprint data
-        desc = descriptors.get(obj.ride_type)
+        desc = descriptors.get(ride_type)
 
         # Format category for Python repr
-        if isinstance(obj.category, list):
-            category_repr = repr(obj.category)
-        else:
-            category_repr = repr(obj.category)
+        category = obj.properties.get("category", "unknown")
+        category_repr = repr(category)
 
         results.append(
-            _ObjectTemplateData(
+            _RideObjectTemplateData(
                 const_name=const_name,
                 identifier=obj.identifier,
                 name=obj.name,
-                ride_type=obj.ride_type,
+                ride_type=ride_type,
                 category_repr=category_repr,
                 tiles_x=desc.tiles_x if desc else None,
                 tiles_y=desc.tiles_y if desc else None,
@@ -88,17 +97,22 @@ def _prepare_objects(ir: ObjectsIR) -> list[_ObjectTemplateData]:
 
 
 def _group_by_category(
-    objects: list[_ObjectTemplateData], ir: ObjectsIR
-) -> dict[str, list[_ObjectTemplateData]]:
-    """Group objects by category for namespace classes."""
-    categories: dict[str, list[_ObjectTemplateData]] = {}
+    objects: list[_RideObjectTemplateData], ir: ObjectsIR
+) -> dict[str, list[_RideObjectTemplateData]]:
+    """Group ride objects by category for namespace classes."""
+    categories: dict[str, list[_RideObjectTemplateData]] = {}
 
-    for obj_def, tmpl_data in zip(ir.ride_objects, objects):
-        cats = (
-            obj_def.category
-            if isinstance(obj_def.category, list)
-            else [obj_def.category]
-        )
+    # Build category mapping from the IR
+    ride_objects = [o for o in ir.objects if o.object_type == "ride"]
+    ride_by_id = {o.identifier: o for o in ride_objects}
+
+    for tmpl_data in objects:
+        ir_obj = ride_by_id.get(tmpl_data.identifier)
+        if not ir_obj:
+            continue
+
+        category = ir_obj.properties.get("category", "unknown")
+        cats = category if isinstance(category, list) else [category]
         for cat in cats:
             categories.setdefault(cat, []).append(tmpl_data)
 
@@ -122,14 +136,14 @@ def render_template(template_name: str, ir: ObjectsIR) -> str:
     env = make_env(_TEMPLATES_DIR, _FILTERS)
     template = env.get_template(j2_file.name)
 
-    objects = _prepare_objects(ir)
-    categories = _group_by_category(objects, ir)
+    ride_objects = _prepare_ride_objects(ir)
+    categories = _group_by_category(ride_objects, ir)
 
     return template.render(
         generator_version=ir.generator_version,
         openrct2_version=ir.openrct2_version,
         objects_version=ir.objects_version,
         generated_at=ir.generated_at,
-        objects=objects,
+        objects=ride_objects,
         categories=categories,
     )

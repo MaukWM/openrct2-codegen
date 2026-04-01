@@ -194,7 +194,7 @@ MAIN_REPO = RepoSource(
 OBJECTS_REPO = RepoSource(
     url="https://github.com/OpenRCT2/objects.git",
     sparse_paths=[
-        "objects/rct2/ride",
+        "objects/rct2",
     ],
     cache_prefix="objects-",
     validate=_validate_objects_source,

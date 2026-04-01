@@ -126,7 +126,7 @@ def generate(
         source_root, objects_root, version=version, objects_version=obj_version
     )
     click.echo(
-        f"Parsed {len(objects_ir.ride_objects)} ride objects, "
+        f"Parsed {len(objects_ir.objects)} objects, "
         f"{len(objects_ir.ride_type_descriptors)} ride type descriptors"
     )
     objects_out.write_text(objects_ir.model_dump_json(indent=2))
