@@ -146,4 +146,5 @@ def render_template(template_name: str, ir: ObjectsIR) -> str:
         generated_at=ir.generated_at,
         objects=ride_objects,
         categories=categories,
+        descriptors=ir.ride_type_descriptors,
     )

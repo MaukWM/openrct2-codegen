@@ -91,10 +91,29 @@ class RideObjects:
         return [o for o in RideObjects.all() if o.ride_type == ride_type]
 
 
-# ── Lookup index ─────────────────────────────────────────────────────
+# ── Lookup indices ───────────────────────────────────────────────────
 
 _BY_IDENTIFIER: dict[str, RideObjectInfo] = {
     {% for obj in objects %}
     "{{ obj.identifier }}": {{ obj.const_name }},
+    {% endfor %}
+}
+
+# Ride type → track element name for flat rides.
+# Derived from C++ RideTypeDescriptor.StartTrackPiece in the RTD headers.
+#
+# Each flat ride type has a specific track piece that determines:
+# 1. The visual model rendered on the map (e.g. a 3x3 carousel vs a 1x1 stall)
+# 2. The physical footprint that blocks construction on surrounding tiles
+# 3. Whether the ride is considered "constructed" and can be opened
+#
+# Using the wrong track type (e.g. END_STATION instead of FLAT_TRACK3X3)
+# results in invisible rides with no footprint.
+#
+# Only flat ride types are included — tracked rides (coasters, water rides)
+# use END_STATION for their station pieces, which is handled separately.
+RIDE_TYPE_TRACK_ELEMS: dict[str, str] = {
+    {% for ride_type, desc in descriptors.items() %}
+    "{{ ride_type }}": "{{ desc.track_elem }}",
     {% endfor %}
 }
