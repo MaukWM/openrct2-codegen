@@ -146,7 +146,7 @@ def render_template(template_name: str, ir: StateIR) -> str:
     union_variant_names = {v for variants in ir.interface_unions.values() for v in variants}
 
     # All non-namespace interfaces, topologically sorted so dependencies come first
-    all_model_names = [n for n in ir.interfaces if n not in namespace_iface_names]
+    all_model_names = [n for n in sorted(ir.interfaces.keys()) if n not in namespace_iface_names]
     all_model_names = _topo_sort_interfaces(all_model_names, ir.interfaces)
 
     # Split into union variants and other leaves (preserving topo order)
