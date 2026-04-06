@@ -40,5 +40,5 @@ def render_template(template_name: str, ir: EnumsIR) -> str:
         generator_version=ir.generator_version,
         openrct2_version=ir.openrct2_version,
         generated_at=ir.generated_at,
-        enums={name: edef.model_dump() for name, edef in ir.enums.items()},
+        enums={name: edef.model_dump() for name, edef in sorted(ir.enums.items())},
     )

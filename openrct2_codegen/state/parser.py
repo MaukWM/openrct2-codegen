@@ -489,7 +489,7 @@ def parse_state(dts_path: Path, openrct2_version: str, source_root: Path) -> Sta
     # Precompute discriminators for all interface unions
     union_discriminators: dict[str, str | None] = {
         name: _find_discriminator(text, variants)
-        for name, variants in interface_unions.items()
+        for name, variants in sorted(interface_unions.items())
     }
 
     # Pass 2: parse interfaces reachable from our namespace roots
@@ -569,7 +569,7 @@ def parse_state(dts_path: Path, openrct2_version: str, source_root: Path) -> Sta
                 referenced_enums.add(prop.flag_union)
             elif prop.ir_type == "array" and prop.item_kind == "enum":
                 referenced_enums.add(prop.item_type)
-    enums = {k: v for k, v in enums.items() if k in referenced_enums}
+    enums = {k: v for k, v in sorted(enums.items()) if k in referenced_enums}
 
     # Trim interface_unions to only those referenced
     referenced_unions: set[str] = set()
@@ -583,10 +583,10 @@ def parse_state(dts_path: Path, openrct2_version: str, source_root: Path) -> Sta
             referenced_unions.add(ec.ts_interface)
     # Include unions whose variants are all in standalone flattened set
     standalone_set = set(_STANDALONE_FLATTENED)
-    for union_name, variants in list(interface_unions.items()):
+    for union_name, variants in sorted(interface_unions.items()):
         if all(v in standalone_set for v in variants):
             referenced_unions.add(union_name)
-    interface_unions = {k: v for k, v in interface_unions.items() if k in referenced_unions}
+    interface_unions = {k: v for k, v in sorted(interface_unions.items()) if k in referenced_unions}
 
     api_version = parse_plugin_api_version(source_root)
 

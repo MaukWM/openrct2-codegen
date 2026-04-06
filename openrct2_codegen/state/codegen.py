@@ -70,7 +70,7 @@ def _literal_value(ts_type: str) -> str | None:
 def _enrich_unions(interfaces, interface_unions):
     """For each union type, compute the discriminator field and per-variant discriminator value."""
     enriched = {}
-    for union_name, variant_names in interface_unions.items():
+    for union_name, variant_names in sorted(interface_unions.items()):
         # Find the discriminator field: first property with a literal ts_type in any variant
         discriminator_field = None
         for variant_name in variant_names:
@@ -187,7 +187,7 @@ def render_template(template_name: str, ir: StateIR) -> str:
         generated_at=ir.generated_at,
         namespaces=namespaces,
         entity_collections=entity_collections,
-        interfaces={k: v.model_dump() for k, v in ir.interfaces.items()},
+        interfaces={k: v.model_dump() for k, v in sorted(ir.interfaces.items())},
         enums=ir.enums,
         unions=enriched_unions,
         union_variants=union_variants,
