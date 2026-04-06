@@ -114,6 +114,7 @@ class EntityCollection(BaseModel):
 
     name: str              # endpoint name: "rides", "staff", "guests"
     access: str            # JS access expression: "map.rides", 'map.getAllEntities("staff")'
+    single_access: str     # JS function for single entity: "map.getRide", "map.getEntity"
     ts_interface: str      # root interface: "Ride", "Guest", or union type alias: "Staff"
     is_union: bool = False # True when ts_interface is a union (e.g. Staff = Handyman | Mechanic | ...)
 

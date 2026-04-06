@@ -210,6 +210,29 @@ function get{{ ec.name | pascal }}(): object[] {
 }
 {% endfor %}
 
+// ── Single entity getters ─────────────────────────────────────────────────────
+{% for ec in entity_collections %}
+{% set singular = ec.name[:-1] if ec.name.endswith('s') else ec.name %}
+
+function get{{ singular | pascal }}ById(id: number): object | null {
+    var item = {{ ec.single_access }}(id);
+{% if ec.name == 'staff' %}
+    if (!item || item.type !== "staff") {
+        return null;
+    }
+{% elif ec.name == 'guests' %}
+    if (!item || item.type !== "guest") {
+        return null;
+    }
+{% else %}
+    if (!item) {
+        return null;
+    }
+{% endif %}
+    return serialize{{ ec.ts_interface }}(item as {{ ec.ts_interface }});
+}
+{% endfor %}
+
 // ── Router ────────────────────────────────────────────────────────────────────
 
 /**
@@ -242,9 +265,23 @@ export function handleQuery(endpoint: string, params: any, reply: (response: obj
 {% endfor %}
 {% endfor %}
 {% for ec in entity_collections %}
+{% set singular = ec.name[:-1] if ec.name.endswith('s') else ec.name %}
         case "{{ ec.name }}":
-            reply({ success: true, payload: get{{ ec.name | pascal }}() });
-            return true;
+            // Check if this is a single entity query (has id param) or bulk query (no params)
+            if (params && typeof params.id === "number") {
+                // Single entity query
+                var result = get{{ singular | pascal }}ById(params.id);
+                if (result === null) {
+                    reply({ success: false, error: "not_found", message: "{{ singular }} not found: " + params.id });
+                    return true;
+                }
+                reply({ success: true, payload: result });
+                return true;
+            } else {
+                // Bulk query
+                reply({ success: true, payload: get{{ ec.name | pascal }}() });
+                return true;
+            }
 {% endfor %}
         default:
             return false;

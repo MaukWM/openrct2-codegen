@@ -169,6 +169,7 @@ def render_template(template_name: str, ir: StateIR) -> str:
         entity_collections.append({
             "name": ec.name,
             "access": ec.access,
+            "single_access": ec.single_access,
             "ts_interface": ec.ts_interface,
             "is_union": ec.is_union,
         })

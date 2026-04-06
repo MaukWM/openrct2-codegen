@@ -37,9 +37,9 @@ _NAMESPACES: list[Namespace] = [
 # Interfaces are parsed with inheritance flattening.
 
 _ENTITY_COLLECTIONS: list[EntityCollection] = [
-    EntityCollection(name="rides",  access="map.rides",                    ts_interface="Ride"),
-    EntityCollection(name="staff",  access='map.getAllEntities("staff")',   ts_interface="Staff", is_union=True),
-    EntityCollection(name="guests", access='map.getAllEntities("guest")',   ts_interface="Guest"),
+    EntityCollection(name="rides",  access="map.rides",                    single_access="map.getRide",  ts_interface="Ride"),
+    EntityCollection(name="staff",  access='map.getAllEntities("staff")',   single_access="map.getEntity", ts_interface="Staff", is_union=True),
+    EntityCollection(name="guests", access='map.getAllEntities("guest")',   single_access="map.getEntity", ts_interface="Guest"),
 ]
 
 # ── Standalone flattened interfaces ──────────────────────────────────
