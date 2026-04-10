@@ -217,6 +217,7 @@ class FootpathAdditionInfo(ObjectInfo):
     is_bench: bool
     is_bin: bool
     is_lamp: bool
+    is_television: bool
     is_breakable: bool
     is_allowed_on_queue: bool
     is_allowed_on_slope: bool
@@ -229,6 +230,7 @@ _FPA_{{ obj.const_name }} = FootpathAdditionInfo(
     is_bench={{ obj.properties.get("isBench", False) | repr }},
     is_bin={{ obj.properties.get("isBin", False) | repr }},
     is_lamp={{ obj.properties.get("isLamp", False) | repr }},
+    is_television={{ obj.properties.get("isTelevision", False) | repr }},
     is_breakable={{ obj.properties.get("isBreakable", False) | repr }},
     is_allowed_on_queue={{ obj.properties.get("isAllowedOnQueue", False) | repr }},
     is_allowed_on_slope={{ obj.properties.get("isAllowedOnSlope", False) | repr }},
