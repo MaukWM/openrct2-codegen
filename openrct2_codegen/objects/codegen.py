@@ -186,6 +186,7 @@ def render_template(template_name: str, ir: ObjectsIR) -> str:
     categories = _group_by_category(ride_objects, ir)
     footpath_surfaces = _prepare_objects(ir, "footpath_surface", names_from_slug=True)
     footpath_railings = _prepare_objects(ir, "footpath_railings", names_from_slug=True)
+    footpath_additions = _prepare_objects(ir, "footpath_item", names_from_slug=True)
 
     return template.render(
         generator_version=ir.generator_version,
@@ -196,5 +197,6 @@ def render_template(template_name: str, ir: ObjectsIR) -> str:
         categories=categories,
         descriptors=ir.ride_type_descriptors,
         footpath_surfaces=footpath_surfaces,
+        footpath_additions=footpath_additions,
         footpath_railings=footpath_railings,
     )

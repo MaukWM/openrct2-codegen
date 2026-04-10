@@ -108,23 +108,17 @@ _BY_IDENTIFIER: dict[str, RideObjectInfo] = {
 class FootpathSurfaceInfo(ObjectInfo):
     """Static info about a footpath surface object."""
 
-    is_queue: bool = False
-    no_slope_railings: bool = False
-    editor_only: bool = False
+    is_queue: bool
+    no_slope_railings: bool
+    editor_only: bool
 
 {% for obj in footpath_surfaces %}
 _FPS_{{ obj.const_name }} = FootpathSurfaceInfo(
     identifier="{{ obj.identifier }}",
     name="{{ obj.name }}",
-    {% if obj.properties.get("isQueue") %}
-    is_queue=True,
-    {% endif %}
-    {% if obj.properties.get("noSlopeRailings") %}
-    no_slope_railings=True,
-    {% endif %}
-    {% if obj.properties.get("editorOnly") %}
-    editor_only=True,
-    {% endif %}
+    is_queue={{ obj.properties.get("isQueue", False) | repr }},
+    no_slope_railings={{ obj.properties.get("noSlopeRailings", False) | repr }},
+    editor_only={{ obj.properties.get("editorOnly", False) | repr }},
 )
 {% endfor %}
 
@@ -166,10 +160,10 @@ _SURFACES_BY_ID: dict[str, FootpathSurfaceInfo] = {
 class FootpathRailingsInfo(ObjectInfo):
     """Static info about a footpath railings object."""
 
-    support_type: str = "pole"
-    scrolling_mode: int = 0
-    has_support_images: bool = False
-    has_elevated_path_images: bool = False
+    support_type: str
+    scrolling_mode: int
+    has_support_images: bool
+    has_elevated_path_images: bool
 
 {% for obj in footpath_railings %}
 _FPR_{{ obj.const_name }} = FootpathRailingsInfo(
@@ -177,12 +171,8 @@ _FPR_{{ obj.const_name }} = FootpathRailingsInfo(
     name="{{ obj.name }}",
     support_type="{{ obj.properties.get('supportType', 'pole') }}",
     scrolling_mode={{ obj.properties.get("scrollingMode", 0) }},
-    {% if obj.properties.get("hasSupportImages") %}
-    has_support_images=True,
-    {% endif %}
-    {% if obj.properties.get("hasElevatedPathImages") %}
-    has_elevated_path_images=True,
-    {% endif %}
+    has_support_images={{ obj.properties.get("hasSupportImages", False) | repr }},
+    has_elevated_path_images={{ obj.properties.get("hasElevatedPathImages", False) | repr }},
 )
 {% endfor %}
 
@@ -214,6 +204,67 @@ class FootpathRailings:
 _RAILINGS_BY_ID: dict[str, FootpathRailingsInfo] = {
     {% for obj in footpath_railings %}
     "{{ obj.identifier }}": _FPR_{{ obj.const_name }},
+    {% endfor %}
+}
+
+
+# ── Footpath addition objects ────────────────────────────────────────
+
+
+class FootpathAdditionInfo(ObjectInfo):
+    """Static info about a footpath addition (bench, lamp, bin, etc.)."""
+
+    is_bench: bool
+    is_bin: bool
+    is_lamp: bool
+    is_breakable: bool
+    is_allowed_on_queue: bool
+    is_allowed_on_slope: bool
+    price: int
+
+{% for obj in footpath_additions %}
+_FPA_{{ obj.const_name }} = FootpathAdditionInfo(
+    identifier="{{ obj.identifier }}",
+    name="{{ obj.name }}",
+    is_bench={{ obj.properties.get("isBench", False) | repr }},
+    is_bin={{ obj.properties.get("isBin", False) | repr }},
+    is_lamp={{ obj.properties.get("isLamp", False) | repr }},
+    is_breakable={{ obj.properties.get("isBreakable", False) | repr }},
+    is_allowed_on_queue={{ obj.properties.get("isAllowedOnQueue", False) | repr }},
+    is_allowed_on_slope={{ obj.properties.get("isAllowedOnSlope", False) | repr }},
+    price={{ obj.properties.get("price", 0) }},
+)
+{% endfor %}
+
+
+class FootpathAdditions:
+    """All {{ footpath_additions | length }} footpath addition objects.
+
+    Access directly:
+        FootpathAdditions.LITTER1
+        FootpathAdditions.LAMP1
+    """
+
+    {% for obj in footpath_additions %}
+    {{ obj.const_name }}: FootpathAdditionInfo = _FPA_{{ obj.const_name }}
+    {% endfor %}
+
+    @staticmethod
+    def all() -> list[FootpathAdditionInfo]:
+        return [
+            {% for obj in footpath_additions %}
+            _FPA_{{ obj.const_name }},
+            {% endfor %}
+        ]
+
+    @staticmethod
+    def by_identifier(identifier: str) -> FootpathAdditionInfo | None:
+        return _ADDITIONS_BY_ID.get(identifier)
+
+
+_ADDITIONS_BY_ID: dict[str, FootpathAdditionInfo] = {
+    {% for obj in footpath_additions %}
+    "{{ obj.identifier }}": _FPA_{{ obj.const_name }},
     {% endfor %}
 }
 
