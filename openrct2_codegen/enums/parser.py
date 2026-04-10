@@ -240,6 +240,20 @@ def parse_enums(source_root: Path, version: str) -> EnumsIR:
     # Synthetic flags: bitflag types that are `using` typedefs with constexpr constants,
     # not `enum class` definitions. Too few and too inconsistent to justify a parser.
 
+    # Footpath edge connectivity bitmask. Each bit indicates a connection in that
+    # direction. Read from FootpathElement.edges, used by FootpathConnectEdges().
+    # Note: bit order does NOT match Direction enum values.
+    enums["EdgeBit"] = EnumDef(
+        source="synthetic",
+        kind="flags",
+        values=[
+            EnumValue(name="west", value=1),
+            EnumValue(name="south", value=2),
+            EnumValue(name="east", value=4),
+            EnumValue(name="north", value=8),
+        ],
+    )
+
     # src/openrct2/actions/terraform/ClearAction.h
     enums["ClearableItems"] = EnumDef(
         source="synthetic",
