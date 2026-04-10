@@ -17,3 +17,11 @@ class {{ enum_name }}({{ "IntFlag" if enum_def["kind"] == "flags" else "IntEnum"
     {{ val.name | to_screaming_snake }} = {{ val.value }}
 {% endfor %}
 {% endfor %}
+
+# ── Sentinel constants ───────────────────────────────────────────────
+# Not enum members — these are sentinel values that live outside the enum range.
+
+# kInvalidDirection (0xFF) from Location.hpp. Means "no direction" or "auto".
+# Used by footpathplace for auto-connect mode. Typed as int so it doesn't
+# pollute Direction iteration.
+INVALID_DIRECTION: int = 255

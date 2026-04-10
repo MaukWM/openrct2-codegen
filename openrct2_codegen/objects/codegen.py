@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any
 
 from openrct2_codegen.objects.ir import ObjectsIR
 from openrct2_codegen.render import make_env
@@ -30,26 +31,83 @@ def _name_to_const(name: str) -> str:
     return result
 
 
+def _dedup_const(const_name: str, used: dict[str, int]) -> str:
+    """Return a unique constant name, appending _2, _3, etc. for duplicates."""
+    if const_name in used:
+        used[const_name] += 1
+        return f"{const_name}_{used[const_name]}"
+    used[const_name] = 1
+    return const_name
+
+
+# ── Template data classes ────────────────────────────────────────────
+
+
 @dataclass
-class _RideObjectTemplateData:
-    """Pre-processed ride object data for the template."""
+class _ObjectTemplateData:
+    """Base template data shared by all object types."""
 
     const_name: str
     identifier: str
     name: str
-    ride_type: str
-    category_repr: str  # Python repr of category (str or list)
-    tiles_x: int | None
-    tiles_y: int | None
-    clearance_height: int | None
+    properties: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
+class _RideObjectTemplateData(_ObjectTemplateData):
+    """Ride-specific template data (computed fields not in source JSON)."""
+
+    ride_type: str = ""  # resolved from properties["type"] (can be str or list)
+    tiles_x: int | None = None  # from RideTypeDescriptor join
+    tiles_y: int | None = None
+    clearance_height: int | None = None
+
+
+# ── Preparation functions ────────────────────────────────────────────
+
+
+def _slug_to_const(identifier: str) -> str:
+    """Derive a SCREAMING_SNAKE constant from the last segment of an identifier.
+
+    "rct2.footpath_surface.tarmac_brown" → "TARMAC_BROWN"
+    "rct2.footpath_railings.bamboo_black" → "BAMBOO_BLACK"
+    """
+    slug = identifier.rsplit(".", 1)[-1]
+    return slug.upper()
+
+
+def _prepare_objects(
+    ir: ObjectsIR, object_type: str, *, names_from_slug: bool = False,
+) -> list[_ObjectTemplateData]:
+    """Filter objects of a given type from the IR."""
+    results: list[_ObjectTemplateData] = []
+    used_names: dict[str, int] = {}
+
+    for obj in ir.objects:
+        if obj.object_type != object_type:
+            continue
+
+        if names_from_slug:
+            const_name = _dedup_const(_slug_to_const(obj.identifier), used_names)
+        else:
+            const_name = _dedup_const(_name_to_const(obj.name), used_names)
+
+        results.append(
+            _ObjectTemplateData(
+                const_name=const_name,
+                identifier=obj.identifier,
+                name=obj.name,
+                properties=obj.properties,
+            )
+        )
+
+    return results
 
 
 def _prepare_ride_objects(ir: ObjectsIR) -> list[_RideObjectTemplateData]:
     """Filter ride objects from the IR, join with descriptors, prepare template data."""
     descriptors = ir.ride_type_descriptors
     results: list[_RideObjectTemplateData] = []
-
-    # Track used const names to handle duplicates
     used_names: dict[str, int] = {}
 
     for obj in ir.objects:
@@ -59,34 +117,20 @@ def _prepare_ride_objects(ir: ObjectsIR) -> list[_RideObjectTemplateData]:
         ride_type_raw = obj.properties.get("type")
         if not ride_type_raw:
             continue
-        # type can be a string or list in the source JSON
         ride_type = (
             ride_type_raw[0] if isinstance(ride_type_raw, list) else ride_type_raw
         )
 
-        const_name = _name_to_const(obj.name)
-
-        # Handle duplicate names (e.g. two "Restroom" objects)
-        if const_name in used_names:
-            used_names[const_name] += 1
-            const_name = f"{const_name}_{used_names[const_name]}"
-        else:
-            used_names[const_name] = 1
-
-        # Join with descriptor for footprint data
+        const_name = _dedup_const(_name_to_const(obj.name), used_names)
         desc = descriptors.get(ride_type)
-
-        # Format category for Python repr
-        category = obj.properties.get("category", "unknown")
-        category_repr = repr(category)
 
         results.append(
             _RideObjectTemplateData(
                 const_name=const_name,
                 identifier=obj.identifier,
                 name=obj.name,
+                properties=obj.properties,
                 ride_type=ride_type,
-                category_repr=category_repr,
                 tiles_x=desc.tiles_x if desc else None,
                 tiles_y=desc.tiles_y if desc else None,
                 clearance_height=desc.clearance_height if desc else None,
@@ -102,7 +146,6 @@ def _group_by_category(
     """Group ride objects by category for namespace classes."""
     categories: dict[str, list[_RideObjectTemplateData]] = {}
 
-    # Build category mapping from the IR
     ride_objects = [o for o in ir.objects if o.object_type == "ride"]
     ride_by_id = {o.identifier: o for o in ride_objects}
 
@@ -116,7 +159,6 @@ def _group_by_category(
         for cat in cats:
             categories.setdefault(cat, []).append(tmpl_data)
 
-    # Sort categories and their contents
     return {
         k: sorted(v, key=lambda o: o.const_name)
         for k, v in sorted(categories.items())
@@ -125,6 +167,7 @@ def _group_by_category(
 
 _FILTERS = {
     "capitalize": str.capitalize,
+    "repr": repr,
 }
 
 
@@ -141,6 +184,8 @@ def render_template(template_name: str, ir: ObjectsIR) -> str:
 
     ride_objects = _prepare_ride_objects(ir)
     categories = _group_by_category(ride_objects, ir)
+    footpath_surfaces = _prepare_objects(ir, "footpath_surface", names_from_slug=True)
+    footpath_railings = _prepare_objects(ir, "footpath_railings", names_from_slug=True)
 
     return template.render(
         generator_version=ir.generator_version,
@@ -150,4 +195,6 @@ def render_template(template_name: str, ir: ObjectsIR) -> str:
         objects=ride_objects,
         categories=categories,
         descriptors=ir.ride_type_descriptors,
+        footpath_surfaces=footpath_surfaces,
+        footpath_railings=footpath_railings,
     )

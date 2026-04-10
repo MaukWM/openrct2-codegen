@@ -14,13 +14,21 @@ GENERATED_OPENRCT2_VERSION: str = "{{ openrct2_version }}"
 GENERATED_OBJECTS_VERSION: str = "{{ objects_version }}"
 
 
-class RideObjectInfo(BaseModel):
-    """Static info about a ride/stall object. Generated from OpenRCT2 object definitions."""
+class ObjectInfo(BaseModel):
+    """Base for all generated object info types."""
 
     model_config = ConfigDict(frozen=True)
 
     identifier: str
     name: str
+
+
+# ── Ride objects ─────────────────────────────────────────────────────
+
+
+class RideObjectInfo(ObjectInfo):
+    """Static info about a ride/stall object."""
+
     ride_type: str
     category: {{ "str | list[str]" }}
     tiles_x: int | None = None
@@ -28,14 +36,12 @@ class RideObjectInfo(BaseModel):
     clearance_height: int | None = None
 
 
-# ── Ride object instances ────────────────────────────────────────────
-
 {% for obj in objects %}
 {{ obj.const_name }} = RideObjectInfo(
     identifier="{{ obj.identifier }}",
     name="{{ obj.name }}",
     ride_type="{{ obj.ride_type }}",
-    category={{ obj.category_repr }},
+    category={{ obj.properties.get("category", "unknown") | repr }},
     {% if obj.tiles_x is not none %}
     tiles_x={{ obj.tiles_x }},
     tiles_y={{ obj.tiles_y }},
@@ -43,8 +49,6 @@ class RideObjectInfo(BaseModel):
     {% endif %}
 )
 {% endfor %}
-
-# ── Category namespaces ──────────────────────────────────────────────
 
 {% for cat_name, cat_objects in categories.items() %}
 
@@ -91,27 +95,131 @@ class RideObjects:
         return [o for o in RideObjects.all() if o.ride_type == ride_type]
 
 
-# ── Lookup indices ───────────────────────────────────────────────────
-
 _BY_IDENTIFIER: dict[str, RideObjectInfo] = {
     {% for obj in objects %}
     "{{ obj.identifier }}": {{ obj.const_name }},
     {% endfor %}
 }
 
-# Ride type → TrackElemType integer value for flat rides.
-# Derived from C++ RideTypeDescriptor.StartTrackPiece in the RTD headers.
-#
-# Each flat ride type has a specific track piece that determines:
-# 1. The visual model rendered on the map (e.g. a 3x3 carousel vs a 1x1 stall)
-# 2. The physical footprint that blocks construction on surrounding tiles
-# 3. Whether the ride is considered "constructed" and can be opened
-#
-# Using the wrong track type (e.g. END_STATION instead of FLAT_TRACK3X3)
-# results in invisible rides with no footprint.
-#
-# Only flat ride types are included — tracked rides (coasters, water rides)
-# are not flat rides and cannot be placed with place_flat_ride().
+
+# ── Footpath surface objects ─────────────────────────────────────────
+
+
+class FootpathSurfaceInfo(ObjectInfo):
+    """Static info about a footpath surface object."""
+
+    is_queue: bool = False
+    no_slope_railings: bool = False
+    editor_only: bool = False
+
+{% for obj in footpath_surfaces %}
+_FPS_{{ obj.const_name }} = FootpathSurfaceInfo(
+    identifier="{{ obj.identifier }}",
+    name="{{ obj.name }}",
+    {% if obj.properties.get("isQueue") %}
+    is_queue=True,
+    {% endif %}
+    {% if obj.properties.get("noSlopeRailings") %}
+    no_slope_railings=True,
+    {% endif %}
+    {% if obj.properties.get("editorOnly") %}
+    editor_only=True,
+    {% endif %}
+)
+{% endfor %}
+
+
+class FootpathSurfaces:
+    """All {{ footpath_surfaces | length }} footpath surface objects.
+
+    Access directly:
+        FootpathSurfaces.TARMAC_FOOTPATH_STAIRS
+    """
+
+    {% for obj in footpath_surfaces %}
+    {{ obj.const_name }}: FootpathSurfaceInfo = _FPS_{{ obj.const_name }}
+    {% endfor %}
+
+    @staticmethod
+    def all() -> list[FootpathSurfaceInfo]:
+        return [
+            {% for obj in footpath_surfaces %}
+            _FPS_{{ obj.const_name }},
+            {% endfor %}
+        ]
+
+    @staticmethod
+    def by_identifier(identifier: str) -> FootpathSurfaceInfo | None:
+        return _SURFACES_BY_ID.get(identifier)
+
+
+_SURFACES_BY_ID: dict[str, FootpathSurfaceInfo] = {
+    {% for obj in footpath_surfaces %}
+    "{{ obj.identifier }}": _FPS_{{ obj.const_name }},
+    {% endfor %}
+}
+
+
+# ── Footpath railings objects ────────────────────────────────────────
+
+
+class FootpathRailingsInfo(ObjectInfo):
+    """Static info about a footpath railings object."""
+
+    support_type: str = "pole"
+    scrolling_mode: int = 0
+    has_support_images: bool = False
+    has_elevated_path_images: bool = False
+
+{% for obj in footpath_railings %}
+_FPR_{{ obj.const_name }} = FootpathRailingsInfo(
+    identifier="{{ obj.identifier }}",
+    name="{{ obj.name }}",
+    support_type="{{ obj.properties.get('supportType', 'pole') }}",
+    scrolling_mode={{ obj.properties.get("scrollingMode", 0) }},
+    {% if obj.properties.get("hasSupportImages") %}
+    has_support_images=True,
+    {% endif %}
+    {% if obj.properties.get("hasElevatedPathImages") %}
+    has_elevated_path_images=True,
+    {% endif %}
+)
+{% endfor %}
+
+
+class FootpathRailings:
+    """All {{ footpath_railings | length }} footpath railings objects.
+
+    Access directly:
+        FootpathRailings.WOODEN_RAILINGS
+    """
+
+    {% for obj in footpath_railings %}
+    {{ obj.const_name }}: FootpathRailingsInfo = _FPR_{{ obj.const_name }}
+    {% endfor %}
+
+    @staticmethod
+    def all() -> list[FootpathRailingsInfo]:
+        return [
+            {% for obj in footpath_railings %}
+            _FPR_{{ obj.const_name }},
+            {% endfor %}
+        ]
+
+    @staticmethod
+    def by_identifier(identifier: str) -> FootpathRailingsInfo | None:
+        return _RAILINGS_BY_ID.get(identifier)
+
+
+_RAILINGS_BY_ID: dict[str, FootpathRailingsInfo] = {
+    {% for obj in footpath_railings %}
+    "{{ obj.identifier }}": _FPR_{{ obj.const_name }},
+    {% endfor %}
+}
+
+
+# ── Ride type track elements ─────────────────────────────────────────
+
 RIDE_TYPE_TRACK_ELEMS: dict[str, int] = {
     {% for ride_type, desc in descriptors.items() %}
     "{{ ride_type }}": {{ desc.track_elem_value }},  # {{ desc.track_elem }}

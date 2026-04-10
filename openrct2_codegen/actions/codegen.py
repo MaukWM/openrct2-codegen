@@ -37,9 +37,15 @@ def _py_type(param: dict) -> str:
     """Map a parameter dict to a Python type annotation string.
 
     Uses ``enum_type`` from the IR when present, otherwise falls back to
-    the basic ir_type → int/bool/str mapping.
+    the basic ir_type → int/bool/str mapping. When ``enum_loose`` is set,
+    renders as ``EnumType | int`` to accept sentinel values.
     """
-    return param.get("enum_type") or _IR_TYPE_TO_PY[param["type"]]
+    enum = param.get("enum_type")
+    if enum:
+        if param.get("enum_loose"):
+            return f"{enum} | int"
+        return enum
+    return _IR_TYPE_TO_PY[param["type"]]
 
 
 def render_template(template_name: str, ir: ActionsIR) -> str:

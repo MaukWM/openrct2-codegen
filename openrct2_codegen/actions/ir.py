@@ -18,6 +18,7 @@ class ActionParameter(BaseModel):
     type: Literal["boolean", "number", "string"]
     cpp_type: str
     enum_type: EnumName | None = None
+    enum_loose: bool = False  # True = render as "EnumType | int" (accepts sentinels)
 
 
 class Action(BaseModel):
@@ -64,6 +65,12 @@ _CPP_TYPE_NAME_TO_ENUM: dict[tuple[CppType, ParamName], EnumName] = {
     ("int32_t", "type"): "AdvertisingCampaignType",       # migratable: if C++ adopts enum class
 }
 
+# (js_action_name, param_name) pairs that accept sentinel values outside the enum
+# range. Enriched normally but rendered as "EnumType | int" instead of just "EnumType".
+_LOOSE_ENUM: set[tuple[str, ParamName]] = {
+    ("footpathplace", "direction"),  # accepts Direction(0-3) OR INVALID_DIRECTION(255)
+}
+
 
 def enrich_enum_types(actions_ir: ActionsIR, enum_names: set[EnumName]) -> None:
     """Resolve and set ``enum_type`` on every action parameter where possible.
@@ -90,3 +97,5 @@ def enrich_enum_types(actions_ir: ActionsIR, enum_names: set[EnumName]) -> None:
                 # Priority 2+3: cpp_type override or direct match.
                 resolved = type_map.get(p.cpp_type)
             p.enum_type = resolved
+            if (action.js_name, p.name) in _LOOSE_ENUM:
+                p.enum_loose = True

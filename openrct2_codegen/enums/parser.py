@@ -225,8 +225,8 @@ def parse_enums(source_root: Path, version: str) -> EnumsIR:
 
     # Synthetic enum: Direction is a uint8_t typedef (not an enum class), always 0-3.
     # Values from TileElementBase.h: TILE_ELEMENT_DIRECTION_{WEST,NORTH,EAST,SOUTH}
-    # INVALID (0xFF / 255) = kInvalidDirection from Location.hpp — sentinel meaning
-    # "no direction" or "auto". Used by footpathplace for auto-connect mode.
+    # Note: kInvalidDirection (0xFF/255) is NOT included — it's a sentinel, not a
+    # direction. It's exposed as INVALID_DIRECTION constant in the enums template.
     enums["Direction"] = EnumDef(
         source="synthetic",
         values=[
@@ -234,7 +234,6 @@ def parse_enums(source_root: Path, version: str) -> EnumsIR:
             EnumValue(name="north", value=1),
             EnumValue(name="east", value=2),
             EnumValue(name="south", value=3),
-            EnumValue(name="invalid", value=255),
         ],
     )
 
