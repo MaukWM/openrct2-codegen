@@ -8,14 +8,14 @@ from pydantic import BaseModel
 class EnumValue(BaseModel):
     """A single named integer value within an enum."""
 
-    name: str   # camelCase name, e.g. "spiralRollerCoaster"
+    name: str  # camelCase name, e.g. "spiralRollerCoaster"
     value: int  # integer value, e.g. 0
 
 
 class EnumDef(BaseModel):
     """All active values for one enum type."""
 
-    source: str              # relative path to the C++ source file, e.g. "src/openrct2/ride/RideData.cpp"
+    source: str  # relative path to the C++ source file, e.g. "src/openrct2/ride/RideData.cpp"
     kind: Literal["enum", "flags"] = "enum"  # "enum" → IntEnum, "flags" → IntFlag
     values: list[EnumValue]  # ordered by integer value
 

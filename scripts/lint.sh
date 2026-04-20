@@ -10,4 +10,4 @@ echo "=== ruff format ==="
 nix-shell -p ruff --run "ruff format ."
 
 echo "=== pre-commit (skip ruff) ==="
-SKIP=ruff,ruff-format .venv/bin/pre-commit run --all-files
+SKIP=ruff,ruff-format uv run pre-commit run --all-files

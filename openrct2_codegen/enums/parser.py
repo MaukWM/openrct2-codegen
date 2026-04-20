@@ -40,6 +40,7 @@ _RTD_ENTRY_RE = re.compile(
 # Name normalisers
 # ---------------------------------------------------------------------------
 
+
 def _to_camel(name: str) -> str:
     """PascalCase or lowerCamelCase → lowerCamelCase."""
     return name[0].lower() + name[1:] if name else name
@@ -54,6 +55,7 @@ def _screaming_snake_to_camel(name: str) -> str:
 # ---------------------------------------------------------------------------
 # Parse functions
 # ---------------------------------------------------------------------------
+
 
 def _extract_enum_body(source: str, cpp_name: str) -> str:
     """Find the brace-delimited body of ``enum class <cpp_name>`` in source."""
@@ -76,7 +78,9 @@ def _parse_raw_entries(body: str) -> list[tuple[str, str | None]]:
     return [(m.group(1), m.group(2)) for m in _VALUE_RE.finditer(body)]
 
 
-def _resolve_values(raw_entries: list[tuple[str, str | None]], cpp_name: str) -> list[EnumValue]:
+def _resolve_values(
+    raw_entries: list[tuple[str, str | None]], cpp_name: str
+) -> list[EnumValue]:
     """Pass 2: resolve each entry to an integer value.
 
     Three cases:
@@ -135,10 +139,12 @@ def parse_ride_type_array(source: str) -> list[EnumValue]:
     for index, m in enumerate(_RTD_ENTRY_RE.finditer(source)):
         if m.group(2) == "kDummyRTD":
             continue
-        values.append(EnumValue(
-            name=_screaming_snake_to_camel(m.group(1)),
-            value=index,  # positional index = integer ride type ID
-        ))
+        values.append(
+            EnumValue(
+                name=_screaming_snake_to_camel(m.group(1)),
+                value=index,  # positional index = integer ride type ID
+            )
+        )
     return values
 
 
@@ -146,67 +152,204 @@ def parse_ride_type_array(source: str) -> list[EnumValue]:
 # Manifest
 # ---------------------------------------------------------------------------
 
+
 @dataclass(frozen=True)
 class _Target:
-    file: str       # path relative to source_root
-    cpp_name: str   # enum class name to search for (e.g. "Type" for Litter::Type)
-    ir_name: str    # key in enums.json (e.g. "LitterType")
-    mode: str       # "enum_class" or "array_index"
+    file: str  # path relative to source_root
+    cpp_name: str  # enum class name to search for (e.g. "Type" for Litter::Type)
+    ir_name: str  # key in enums.json (e.g. "LitterType")
+    mode: str  # "enum_class" or "array_index"
 
 
 _ENUM_TARGETS: list[_Target] = [
     # ── entity/ ─────────────────────────────────────────────────────────────
-    _Target("src/openrct2/entity/Guest.h",  "PeepThoughtType",      "PeepThoughtType",      "enum_class"),
-    _Target("src/openrct2/entity/Guest.h",  "PeepNauseaTolerance",  "PeepNauseaTolerance",  "enum_class"),
-    _Target("src/openrct2/entity/Peep.h",   "PeepState",            "PeepState",            "enum_class"),
-    _Target("src/openrct2/entity/Peep.h",   "PeepActionType",       "PeepActionType",       "enum_class"),
-    _Target("src/openrct2/entity/Peep.h",   "PeepAnimationType",    "PeepAnimationType",    "enum_class"),
-    _Target("src/openrct2/entity/Peep.h",   "PeepAnimationGroup",   "PeepAnimationGroup",   "enum_class"),
-    _Target("src/openrct2/entity/Litter.h", "Type",                 "LitterType",           "enum_class"),
-    _Target("src/openrct2/entity/Staff.h",  "StaffType",            "StaffType",            "enum_class"),
+    _Target(
+        "src/openrct2/entity/Guest.h",
+        "PeepThoughtType",
+        "PeepThoughtType",
+        "enum_class",
+    ),
+    _Target(
+        "src/openrct2/entity/Guest.h",
+        "PeepNauseaTolerance",
+        "PeepNauseaTolerance",
+        "enum_class",
+    ),
+    _Target("src/openrct2/entity/Peep.h", "PeepState", "PeepState", "enum_class"),
+    _Target(
+        "src/openrct2/entity/Peep.h", "PeepActionType", "PeepActionType", "enum_class"
+    ),
+    _Target(
+        "src/openrct2/entity/Peep.h",
+        "PeepAnimationType",
+        "PeepAnimationType",
+        "enum_class",
+    ),
+    _Target(
+        "src/openrct2/entity/Peep.h",
+        "PeepAnimationGroup",
+        "PeepAnimationGroup",
+        "enum_class",
+    ),
+    _Target("src/openrct2/entity/Litter.h", "Type", "LitterType", "enum_class"),
+    _Target("src/openrct2/entity/Staff.h", "StaffType", "StaffType", "enum_class"),
     # ── ride/ ────────────────────────────────────────────────────────────────
-    _Target("src/openrct2/ride/RideData.cpp", "RideType",           "RideType",             "array_index"),
-    _Target("src/openrct2/ride/Ride.h",     "RideMode",             "RideMode",             "enum_class"),
-    _Target("src/openrct2/ride/Ride.h",     "RideInspection",       "RideInspection",       "enum_class"),
-    _Target("src/openrct2/ride/Ride.h",     "RideStatus",           "RideStatus",           "enum_class"),
-    _Target("src/openrct2/ride/ShopItem.h", "ShopItem",             "ShopItem",             "enum_class"),
-    _Target("src/openrct2/ride/Track.h",    "TrackElemType",        "TrackElemType",        "enum_class"),
-    _Target("src/openrct2/ride/Track.h",    "TrackRoll",            "TrackRoll",            "enum_class"),
-    _Target("src/openrct2/ride/Track.h",    "TrackPitch",           "TrackPitch",           "enum_class"),
-    _Target("src/openrct2/ride/Track.h",    "TrackCurve",           "TrackCurve",           "enum_class"),
+    _Target("src/openrct2/ride/RideData.cpp", "RideType", "RideType", "array_index"),
+    _Target("src/openrct2/ride/Ride.h", "RideMode", "RideMode", "enum_class"),
+    _Target(
+        "src/openrct2/ride/Ride.h", "RideInspection", "RideInspection", "enum_class"
+    ),
+    _Target("src/openrct2/ride/Ride.h", "RideStatus", "RideStatus", "enum_class"),
+    _Target("src/openrct2/ride/ShopItem.h", "ShopItem", "ShopItem", "enum_class"),
+    _Target(
+        "src/openrct2/ride/ted/TrackElemType.h",
+        "TrackElemType",
+        "TrackElemType",
+        "enum_class",
+    ),
+    _Target(
+        "src/openrct2/ride/ted/PitchAndRoll.h", "TrackRoll", "TrackRoll", "enum_class"
+    ),
+    _Target(
+        "src/openrct2/ride/ted/PitchAndRoll.h", "TrackPitch", "TrackPitch", "enum_class"
+    ),
+    _Target(
+        "src/openrct2/ride/ted/TrackElementDescriptor.h",
+        "TrackCurve",
+        "TrackCurve",
+        "enum_class",
+    ),
     # ── drawing/ ─────────────────────────────────────────────────────────────
-    _Target("src/openrct2/drawing/Colour.h", "Colour",              "Colour",               "enum_class"),
+    _Target("src/openrct2/drawing/Colour.h", "Colour", "Colour", "enum_class"),
     # ── root src/openrct2/ (included via cone-mode sparse checkout) ──────────
-    _Target("src/openrct2/Cheats.h",        "CheatType",            "CheatType",            "enum_class"),
+    _Target("src/openrct2/Cheats.h", "CheatType", "CheatType", "enum_class"),
     # ── actions/ ─────────────────────────────────────────────────────────────
-    _Target("src/openrct2/actions/ride/RideSetSettingAction.h",         "RideSetSetting",       "RideSetSetting",       "enum_class"),
-    _Target("src/openrct2/actions/ride/RideSetAppearanceAction.h",      "RideSetAppearanceType","RideSetAppearanceType","enum_class"),
-    _Target("src/openrct2/actions/ride/RideSetVehicleAction.h",         "RideSetVehicleType",   "RideSetVehicleType",   "enum_class"),
-    _Target("src/openrct2/actions/ride/RideDemolishAction.h",           "RideModifyType",       "RideModifyType",       "enum_class"),
-    _Target("src/openrct2/actions/ride/RideFreezeRatingAction.h",       "RideRatingType",       "RideRatingType",       "enum_class"),
-    _Target("src/openrct2/actions/scenery/BannerSetStyleAction.h",      "BannerSetStyleType",   "BannerSetStyleType",   "enum_class"),
-    _Target("src/openrct2/actions/park/LandBuyRightsAction.h",          "LandBuyRightSetting",  "LandBuyRightSetting",  "enum_class"),
-    _Target("src/openrct2/actions/park/LandSetRightsAction.h",          "LandSetRightSetting",  "LandSetRightSetting",  "enum_class"),
-    _Target("src/openrct2/actions/ride/MazeSetTrackAction.h",           "MazeBuildMode",        "MazeBuildMode",        "enum_class"),
-    _Target("src/openrct2/actions/peep/PeepPickupAction.h",             "PeepPickupType",       "PeepPickupType",       "enum_class"),
-    _Target("src/openrct2/actions/general/TileModifyAction.h",          "TileModifyType",       "TileModifyType",       "enum_class"),
-    _Target("src/openrct2/actions/park/ParkSetParameterAction.h",       "ParkParameter",        "ParkParameter",        "enum_class"),
-    _Target("src/openrct2/actions/general/ScenarioSetSettingAction.h",  "ScenarioSetSetting",   "ScenarioSetSetting",   "enum_class"),
-    _Target("src/openrct2/actions/general/LoadOrQuitAction.h",          "LoadOrQuitModes",      "LoadOrQuitModes",      "enum_class"),
-    _Target("src/openrct2/actions/peep/StaffSetPatrolAreaAction.h",     "StaffSetPatrolAreaMode","StaffSetPatrolAreaMode","enum_class"),
-    _Target("src/openrct2/actions/network/NetworkModifyGroupAction.h",  "ModifyGroupType",      "ModifyGroupType",      "enum_class"),
-    _Target("src/openrct2/actions/network/NetworkModifyGroupAction.h",  "PermissionState",      "PermissionState",      "enum_class"),
+    _Target(
+        "src/openrct2/actions/ride/RideSetSettingAction.h",
+        "RideSetSetting",
+        "RideSetSetting",
+        "enum_class",
+    ),
+    _Target(
+        "src/openrct2/actions/ride/RideSetAppearanceAction.h",
+        "RideSetAppearanceType",
+        "RideSetAppearanceType",
+        "enum_class",
+    ),
+    _Target(
+        "src/openrct2/actions/ride/RideSetVehicleAction.h",
+        "RideSetVehicleType",
+        "RideSetVehicleType",
+        "enum_class",
+    ),
+    _Target(
+        "src/openrct2/actions/ride/RideDemolishAction.h",
+        "RideModifyType",
+        "RideModifyType",
+        "enum_class",
+    ),
+    _Target(
+        "src/openrct2/actions/ride/RideFreezeRatingAction.h",
+        "RideRatingType",
+        "RideRatingType",
+        "enum_class",
+    ),
+    _Target(
+        "src/openrct2/actions/scenery/BannerSetStyleAction.h",
+        "BannerSetStyleType",
+        "BannerSetStyleType",
+        "enum_class",
+    ),
+    _Target(
+        "src/openrct2/actions/park/LandBuyRightsAction.h",
+        "LandBuyRightSetting",
+        "LandBuyRightSetting",
+        "enum_class",
+    ),
+    _Target(
+        "src/openrct2/actions/park/LandSetRightsAction.h",
+        "LandSetRightSetting",
+        "LandSetRightSetting",
+        "enum_class",
+    ),
+    _Target(
+        "src/openrct2/actions/ride/MazeSetTrackAction.h",
+        "MazeBuildMode",
+        "MazeBuildMode",
+        "enum_class",
+    ),
+    _Target(
+        "src/openrct2/actions/peep/PeepPickupAction.h",
+        "PeepPickupType",
+        "PeepPickupType",
+        "enum_class",
+    ),
+    _Target(
+        "src/openrct2/actions/general/TileModifyAction.h",
+        "TileModifyType",
+        "TileModifyType",
+        "enum_class",
+    ),
+    _Target(
+        "src/openrct2/actions/park/ParkSetParameterAction.h",
+        "ParkParameter",
+        "ParkParameter",
+        "enum_class",
+    ),
+    _Target(
+        "src/openrct2/actions/general/ScenarioSetSettingAction.h",
+        "ScenarioSetSetting",
+        "ScenarioSetSetting",
+        "enum_class",
+    ),
+    _Target(
+        "src/openrct2/actions/general/LoadOrQuitAction.h",
+        "LoadOrQuitModes",
+        "LoadOrQuitModes",
+        "enum_class",
+    ),
+    _Target(
+        "src/openrct2/actions/peep/StaffSetPatrolAreaAction.h",
+        "StaffSetPatrolAreaMode",
+        "StaffSetPatrolAreaMode",
+        "enum_class",
+    ),
+    _Target(
+        "src/openrct2/actions/network/NetworkModifyGroupAction.h",
+        "ModifyGroupType",
+        "ModifyGroupType",
+        "enum_class",
+    ),
+    _Target(
+        "src/openrct2/actions/network/NetworkModifyGroupAction.h",
+        "PermissionState",
+        "PermissionState",
+        "enum_class",
+    ),
     # ── world/ ───────────────────────────────────────────────────────────────
-    _Target("src/openrct2/world/MapSelection.h",  "MapSelectType",    "MapSelectType",        "enum_class"),
-    _Target("src/openrct2/world/Footpath.h",      "FootpathSlopeType","FootpathSlopeType",    "enum_class"),
+    _Target(
+        "src/openrct2/world/MapSelection.h",
+        "MapSelectType",
+        "MapSelectType",
+        "enum_class",
+    ),
+    _Target(
+        "src/openrct2/world/Footpath.h",
+        "FootpathSlopeType",
+        "FootpathSlopeType",
+        "enum_class",
+    ),
     # ── interface/ ───────────────────────────────────────────────────────────
-    _Target("src/openrct2/interface/Window.h",    "PromptMode",       "PromptMode",           "enum_class"),
+    _Target(
+        "src/openrct2/interface/Window.h", "PromptMode", "PromptMode", "enum_class"
+    ),
 ]
 
 
 # ---------------------------------------------------------------------------
 # Top-level entry point
 # ---------------------------------------------------------------------------
+
 
 def parse_enums(source_root: Path, version: str) -> EnumsIR:
     """Parse all enum targets and return the full EnumsIR."""

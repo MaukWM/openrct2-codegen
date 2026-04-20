@@ -24,9 +24,9 @@ class ActionParameter(BaseModel):
 class Action(BaseModel):
     """A single game action with its full parameter signature."""
 
-    js_name: str         # "ridecreate"
-    cpp_class: str       # "RideCreateAction"
-    game_command: str    # "CreateRide"
+    js_name: str  # "ridecreate"
+    cpp_class: str  # "RideCreateAction"
+    game_command: str  # "CreateRide"
     # Derived from subdirectory name (e.g. "ride", "park", "terraform").
     # Defaults to "general" for pre-v0.4.32 where actions are flat in actions/.
     category: str
@@ -59,10 +59,16 @@ _CPP_TYPE_TO_ENUM: dict[CppType, EnumName] = {
 # directly — the direct-match path in enrich_enum_types would then handle them.
 _CPP_TYPE_NAME_TO_ENUM: dict[tuple[CppType, ParamName], EnumName] = {
     ("CoordsXYZD", "direction"): "Direction",
-    ("uint8_t", "staffType"): "StaffType",              # migratable: if C++ uses StaffType directly
-    ("uint8_t", "speed"): "GameSpeed",                   # not migratable: no C++ enum exists
-    ("uint8_t", "fundingAmount"): "ResearchFundingLevel", # migratable: if C++ adopts enum class
-    ("int32_t", "type"): "AdvertisingCampaignType",       # migratable: if C++ adopts enum class
+    ("uint8_t", "staffType"): "StaffType",  # migratable: if C++ uses StaffType directly
+    ("uint8_t", "speed"): "GameSpeed",  # not migratable: no C++ enum exists
+    (
+        "uint8_t",
+        "fundingAmount",
+    ): "ResearchFundingLevel",  # migratable: if C++ adopts enum class
+    (
+        "int32_t",
+        "type",
+    ): "AdvertisingCampaignType",  # migratable: if C++ adopts enum class
 }
 
 # (js_action_name, param_name) pairs that accept sentinel values outside the enum

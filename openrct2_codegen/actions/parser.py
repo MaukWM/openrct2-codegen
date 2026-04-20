@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from importlib.metadata import version as pkg_version
 from pathlib import Path
+from typing import Literal
 
 import tree_sitter_cpp as tscpp
 from tree_sitter import Language, Parser
@@ -17,35 +18,27 @@ _PLUGIN_API_VERSION_RE = re.compile(
 )
 
 # Matches entries like: { "ridecreate", GameCommand::CreateRide },
-_ACTION_NAME_RE = re.compile(
-    r'\{\s*"(\w+)"\s*,\s*GameCommand::(\w+)\s*\}'
-)
+_ACTION_NAME_RE = re.compile(r'\{\s*"(\w+)"\s*,\s*GameCommand::(\w+)\s*\}')
 
 # 2-arg form: visitor.Visit("jsName", _member) or visitor.Visit("jsName", _member.field)
 # Matches member declarations like: ride_type_t _rideType{ kRideTypeNull };
 # Captures: (type, member_name)
 # Matches: class FooAction final : public GameActionBase<GameCommand::BarBaz>
-_GAME_COMMAND_RE = re.compile(
-    r"GameActionBase<GameCommand::(\w+)>"
-)
+_GAME_COMMAND_RE = re.compile(r"GameActionBase<GameCommand::(\w+)>")
 
 _MEMBER_DECL_RE = re.compile(
     r"^\s+([\w:]+(?:<[\w:,\s]+>)?)\s+(_\w+)\s*(?:\{[^}]*\}|=[^;]+)?\s*;",
     re.MULTILINE,
 )
 
-_VISIT_NAMED_RE = re.compile(
-    r'visitor\.Visit\(\s*"(\w+)"\s*,\s*(\w+(?:\.\w+)?)\s*\)'
-)
+_VISIT_NAMED_RE = re.compile(r'visitor\.Visit\(\s*"(\w+)"\s*,\s*(\w+(?:\.\w+)?)\s*\)')
 
 # 1-arg form: visitor.Visit(_member) — unnamed coordinate
-_VISIT_UNNAMED_RE = re.compile(
-    r'visitor\.Visit\(\s*(_\w+)\s*\)'
-)
+_VISIT_UNNAMED_RE = re.compile(r"visitor\.Visit\(\s*(_\w+)\s*\)")
 
 
 # C++ type → JSON type resolution
-_CPP_TO_JSON_TYPE: dict[str, str] = {
+_CPP_TO_JSON_TYPE: dict[str, Literal["boolean", "number", "string"]] = {
     "bool": "boolean",
     "std::string": "string",
 }
@@ -67,7 +60,7 @@ _NAMESPACE_ALIASES: dict[str, str] = {
 # Struct sub-field overrides: (struct_cpp_type, field_name) → actual cpp_type
 # Used when AcceptParameters visits _foo.field rather than _foo directly.
 _STRUCT_FIELD_TYPES: dict[tuple[str, str], str] = {
-    ("FootpathSlope", "type"):      "FootpathSlopeType",
+    ("FootpathSlope", "type"): "FootpathSlopeType",
     ("FootpathSlope", "direction"): "Direction",
 }
 
@@ -77,8 +70,8 @@ class ResolvedParam:
     """A fully resolved action parameter."""
 
     js_name: str
-    json_type: str   # "boolean", "number", or "string"
-    cpp_type: str    # original C++ type for reference
+    json_type: Literal["boolean", "number", "string"]
+    cpp_type: str  # original C++ type for reference
 
 
 @dataclass
@@ -86,7 +79,7 @@ class VisitCall:
     """A single visitor.Visit() call extracted from AcceptParameters."""
 
     js_name: str | None  # None for unnamed coordinates
-    member: str          # C++ member: "_rideType", "_origin", "_slope.type"
+    member: str  # C++ member: "_rideType", "_origin", "_slope.type"
 
 
 def parse_actions(source_root: Path, version: str) -> "ActionsIR":
@@ -141,13 +134,15 @@ def parse_actions(source_root: Path, version: str) -> "ActionsIR":
                 for p in resolved
             ]
 
-        actions.append(Action(
-            js_name=js_name,
-            cpp_class=class_name,
-            game_command=game_command,
-            category=category,
-            parameters=parameters,
-        ))
+        actions.append(
+            Action(
+                js_name=js_name,
+                cpp_class=class_name,
+                game_command=game_command,
+                category=category,
+                parameters=parameters,
+            )
+        )
 
     return ActionsIR(
         openrct2_version=version,
@@ -263,20 +258,28 @@ def resolve_params(
                     f"unrecognized coordinate type: {cpp_type}"
                 )
             for field in fields:
-                params.append(ResolvedParam(
-                    js_name=field, json_type="number", cpp_type=cpp_type,
-                ))
+                params.append(
+                    ResolvedParam(
+                        js_name=field,
+                        json_type="number",
+                        cpp_type=cpp_type,
+                    )
+                )
         else:
             # Named parameter — resolve type
             json_type = _cpp_to_json_type(cpp_type)
-            params.append(ResolvedParam(
-                js_name=call.js_name, json_type=json_type, cpp_type=cpp_type,
-            ))
+            params.append(
+                ResolvedParam(
+                    js_name=call.js_name,
+                    json_type=json_type,
+                    cpp_type=cpp_type,
+                )
+            )
 
     return params
 
 
-def _cpp_to_json_type(cpp_type: str) -> str:
+def _cpp_to_json_type(cpp_type: str) -> Literal["boolean", "number", "string"]:
     """Map a C++ type to a JSON type."""
     if cpp_type in _CPP_TO_JSON_TYPE:
         return _CPP_TO_JSON_TYPE[cpp_type]
@@ -358,7 +361,7 @@ def _extract_accept_parameters_body(root, source: bytes) -> str | None:
         if declarator is None:
             continue
 
-        declarator_text = source[declarator.start_byte:declarator.end_byte].decode()
+        declarator_text = source[declarator.start_byte : declarator.end_byte].decode()
         if "AcceptParameters" not in declarator_text:
             continue
 
@@ -367,7 +370,7 @@ def _extract_accept_parameters_body(root, source: bytes) -> str | None:
         if body is None:
             continue
 
-        return source[body.start_byte:body.end_byte].decode()
+        return source[body.start_byte : body.end_byte].decode()
 
     return None
 

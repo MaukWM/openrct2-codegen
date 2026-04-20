@@ -77,7 +77,10 @@ def _slug_to_const(identifier: str) -> str:
 
 
 def _prepare_objects(
-    ir: ObjectsIR, object_type: str, *, names_from_slug: bool = False,
+    ir: ObjectsIR,
+    object_type: str,
+    *,
+    names_from_slug: bool = False,
 ) -> list[_ObjectTemplateData]:
     """Filter objects of a given type from the IR."""
     results: list[_ObjectTemplateData] = []
@@ -160,8 +163,7 @@ def _group_by_category(
             categories.setdefault(cat, []).append(tmpl_data)
 
     return {
-        k: sorted(v, key=lambda o: o.const_name)
-        for k, v in sorted(categories.items())
+        k: sorted(v, key=lambda o: o.const_name) for k, v in sorted(categories.items())
     }
 
 
@@ -175,9 +177,7 @@ def render_template(template_name: str, ir: ObjectsIR) -> str:
     """Render an objects codegen template with the given IR."""
     j2_file = _TEMPLATES_DIR / f"{template_name}.j2"
     if not j2_file.is_file():
-        raise ValueError(
-            f"Unknown template: {template_name!r} (no file at {j2_file})"
-        )
+        raise ValueError(f"Unknown template: {template_name!r} (no file at {j2_file})")
 
     env = make_env(_TEMPLATES_DIR, _FILTERS)
     template = env.get_template(j2_file.name)

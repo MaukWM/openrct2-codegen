@@ -1,6 +1,7 @@
 """Render Jinja2 templates from a StateIR."""
 
 import re
+from collections.abc import Mapping
 from pathlib import Path
 
 from openrct2_codegen.render import make_env
@@ -78,7 +79,10 @@ def _enrich_unions(interfaces, interface_unions):
             if not iface:
                 continue
             for prop in iface.properties:
-                if hasattr(prop, "ts_type") and _literal_value(prop.ts_type) is not None:
+                if (
+                    hasattr(prop, "ts_type")
+                    and _literal_value(prop.ts_type) is not None
+                ):
                     discriminator_field = prop.name
                     break
             if discriminator_field:
@@ -93,11 +97,15 @@ def _enrich_unions(interfaces, interface_unions):
                     if prop.name == discriminator_field and hasattr(prop, "ts_type"):
                         disc_value = _literal_value(prop.ts_type)
                         break
-            variants_enriched.append({
-                "name": variant_name,
-                "discriminator_value": disc_value,
-                "properties": [p.model_dump() for p in iface.properties] if iface else [],
-            })
+            variants_enriched.append(
+                {
+                    "name": variant_name,
+                    "discriminator_value": disc_value,
+                    "properties": [p.model_dump() for p in iface.properties]
+                    if iface
+                    else [],
+                }
+            )
 
         enriched[union_name] = {
             "discriminator": discriminator_field,
@@ -106,8 +114,11 @@ def _enrich_unions(interfaces, interface_unions):
     return enriched
 
 
-def _topo_sort_interfaces(names: list[str], interfaces: dict[str, object]) -> list[str]:
+def _topo_sort_interfaces(
+    names: list[str], interfaces: Mapping[str, object]
+) -> list[str]:
     """Topologically sort interface names so dependencies come first."""
+
     def _deps(iface) -> set[str]:
         deps: set[str] = set()
         for p in iface.properties:
@@ -143,38 +154,57 @@ def render_template(template_name: str, ir: StateIR) -> str:
         raise ValueError(f"Unknown template: {template_name!r} (no file at {j2_file})")
 
     namespace_iface_names = {ns.ts_interface for ns in ir.namespaces}
-    union_variant_names = {v for variants in ir.interface_unions.values() for v in variants}
+    union_variant_names = {
+        v for variants in ir.interface_unions.values() for v in variants
+    }
 
     # All non-namespace interfaces, topologically sorted so dependencies come first
-    all_model_names = [n for n in sorted(ir.interfaces.keys()) if n not in namespace_iface_names]
+    all_model_names = [
+        n for n in sorted(ir.interfaces.keys()) if n not in namespace_iface_names
+    ]
     all_model_names = _topo_sort_interfaces(all_model_names, ir.interfaces)
 
     # Split into union variants and other leaves (preserving topo order)
-    union_variants = [ir.interfaces[n].model_dump() for n in all_model_names if n in union_variant_names]
-    other_leaves = [ir.interfaces[n].model_dump() for n in all_model_names if n not in union_variant_names]
+    union_variants = [
+        ir.interfaces[n].model_dump()
+        for n in all_model_names
+        if n in union_variant_names
+    ]
+    other_leaves = [
+        ir.interfaces[n].model_dump()
+        for n in all_model_names
+        if n not in union_variant_names
+    ]
 
     enriched_unions = _enrich_unions(ir.interfaces, ir.interface_unions)
 
     namespaces = []
     for ns in ir.namespaces:
         iface = ir.interfaces[ns.ts_interface]
-        namespaces.append({
-            "name": ns.name,
-            "ts_interface": ns.ts_interface,
-            "properties": [p.model_dump() for p in iface.properties],
-        })
+        namespaces.append(
+            {
+                "name": ns.name,
+                "ts_interface": ns.ts_interface,
+                "properties": [p.model_dump() for p in iface.properties],
+            }
+        )
 
     entity_collections = []
     for ec in ir.entity_collections:
-        entity_collections.append({
-            "name": ec.name,
-            "access": ec.access,
-            "single_access": ec.single_access,
-            "ts_interface": ec.ts_interface,
-            "is_union": ec.is_union,
-        })
+        entity_collections.append(
+            {
+                "name": ec.name,
+                "access": ec.access,
+                "single_access": ec.single_access,
+                "ts_interface": ec.ts_interface,
+                "is_union": ec.is_union,
+            }
+        )
 
-    env = make_env(_TEMPLATES_DIR, {"pascal": _pascal, "camel_to_snake": _camel_to_snake, "py_type": _py_type})
+    env = make_env(
+        _TEMPLATES_DIR,
+        {"pascal": _pascal, "camel_to_snake": _camel_to_snake, "py_type": _py_type},
+    )
     template = env.get_template(j2_file.name)
 
     # For Python: all models in topo order (union variants interleaved with leaves)
