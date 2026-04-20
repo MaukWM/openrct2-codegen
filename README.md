@@ -14,7 +14,7 @@ All three feed Jinja2 templates that generate TypeScript plugin handlers and Pyt
 ### 1. Generate IRs
 
 ```bash
-openrct2-codegen generate --openrct2-version v0.4.32
+openrct2-codegen generate --openrct2-version v0.5.0
 # → generated/actions.json
 # → generated/state.json
 ```
@@ -38,32 +38,6 @@ openrct2-codegen render --template actions.py --out ../pyrct2/pyrct2/_generated/
 
 ## Version compatibility
 
-### Actions (`actions.json`)
+Codegen targets a single OpenRCT2 version at a time. Currently: **v0.5.0** (Plugin API v111).
 
-Works with OpenRCT2 **v0.3.5.1+** (Nov 2021 onwards, 78–81 actions depending on version).
-
-Versions before v0.2.6 have no plugin scripting system. Versions v0.3.0–v0.3.5 have scripting but use an older C-style enum format (`GAME_COMMAND_*`) that the parser doesn't support — v0.3.5.1 switched to `GameCommand::*` scoped enums which is what we parse.
-
-### State (`state.json`)
-
-Requires OpenRCT2 **v0.4.25+**. Interfaces were added incrementally:
-
-```
-v0.3.0  (2020-08-15): Park, Cheats, GameDate, ParkMessage
-v0.3.1  (2020-09-27): + Scenario
-v0.3.4  (2021-07-19): + Climate
-v0.4.5  (2023-05-08): + Research, ResearchItem (park.research)
-v0.4.20 (2025-02-25): ClimateState → WeatherState rename
-v0.4.25 (2025-08-03): + Award, AwardType (park.awards)  ← minimum for full IR
-```
-
-Current target: **v0.4.32** (Plugin API v110).
-
-### Enums (`enums.json`)
-
-Development and testing was done against **v0.4.32**. Mileage will vary for older versions:
-
-- Integer values for all enums are stable across versions (OpenRCT2's save-game compatibility policy prevents reshuffling)
-- String names change when the project does mass renames (e.g. PascalCase → lowerCamelCase sprint in Oct–Dec 2025)
-- New values are added over time (ride types ~3/year, cheat types ~2/year) — unknown integers degrade gracefully to `"unknown_<n>"` rather than crashing
-- `drawing/Colour.h` was introduced in v0.4.31; the colour enum is unavailable on older version tags
+You can pass older version tags to `--openrct2-version`, but no support is offered — file paths and enum definitions move between releases, so the parser may fail or produce incomplete output.
