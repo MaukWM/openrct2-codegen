@@ -271,10 +271,49 @@ _ADDITIONS_BY_ID: dict[str, FootpathAdditionInfo] = {
 }
 
 
-# ── Ride type track elements ─────────────────────────────────────────
+# ── Ride type track elements (flat rides only) ──────────────────────
 
 RIDE_TYPE_TRACK_ELEMS: dict[str, int] = {
     {% for ride_type, desc in descriptors.items() %}
+    {% if desc.track_elem_value is not none %}
     "{{ ride_type }}": {{ desc.track_elem_value }},  # {{ desc.track_elem }}
+    {% endif %}
     {% endfor %}
 }
+
+
+# ── Ride type track groups ──────────────────────────────────────────
+
+RIDE_TYPE_ENABLED_GROUPS: dict[str, tuple[str, ...]] = {
+    {% for ride_type, desc in descriptors.items() %}
+    {% if desc.enabled_track_groups %}
+    "{{ ride_type }}": (
+        {% for g in desc.enabled_track_groups %}
+        "{{ g | to_screaming_snake }}",
+        {% endfor %}
+    ),
+    {% endif %}
+    {% endfor %}
+}
+
+RIDE_TYPE_EXTRA_GROUPS: dict[str, tuple[str, ...]] = {
+    {% for ride_type, desc in descriptors.items() %}
+    {% if desc.extra_track_groups %}
+    "{{ ride_type }}": (
+        {% for g in desc.extra_track_groups %}
+        "{{ g | to_screaming_snake }}",
+        {% endfor %}
+    ),
+    {% endif %}
+    {% endfor %}
+}
+
+
+# ── TrackElemType → TrackGroup mapping ──────────────────────────────
+# Index = TrackElemType int value, value = TrackGroup SCREAMING_SNAKE name.
+
+TRACK_ELEM_TO_GROUP: tuple[str, ...] = (
+    {% for group_name in track_element_groups %}
+    "{{ group_name | to_screaming_snake }}",  # {{ loop.index0 }}
+    {% endfor %}
+)

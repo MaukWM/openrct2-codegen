@@ -167,9 +167,18 @@ def _group_by_category(
     }
 
 
+def _to_screaming_snake(name: str) -> str:
+    """Convert lowerCamelCase or PascalCase to SCREAMING_SNAKE_CASE."""
+    result = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", "_", name).upper()
+    if result and result[0].isdigit():
+        result = f"_{result}"
+    return result
+
+
 _FILTERS = {
     "capitalize": str.capitalize,
     "repr": repr,
+    "to_screaming_snake": _to_screaming_snake,
 }
 
 
@@ -196,6 +205,7 @@ def render_template(template_name: str, ir: ObjectsIR) -> str:
         objects=ride_objects,
         categories=categories,
         descriptors=ir.ride_type_descriptors,
+        track_element_groups=ir.track_element_groups,
         footpath_surfaces=footpath_surfaces,
         footpath_additions=footpath_additions,
         footpath_railings=footpath_railings,

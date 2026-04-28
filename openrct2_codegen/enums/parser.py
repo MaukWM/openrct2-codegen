@@ -219,6 +219,12 @@ _ENUM_TARGETS: list[_Target] = [
         "TrackCurve",
         "enum_class",
     ),
+    _Target(
+        "src/openrct2/ride/ted/TrackGroup.h",
+        "TrackGroup",
+        "TrackGroup",
+        "enum_class",
+    ),
     # ── drawing/ ─────────────────────────────────────────────────────────────
     _Target("src/openrct2/drawing/Colour.h", "Colour", "Colour", "enum_class"),
     # ── root src/openrct2/ (included via cone-mode sparse checkout) ──────────

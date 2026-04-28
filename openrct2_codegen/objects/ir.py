@@ -27,17 +27,20 @@ class RideTypeDescriptor(BaseModel):
     """Per-ride-type data derived from C++ RideTypeDescriptor (RTD headers).
 
     Mirrors the C++ RideTypeDescriptor struct from src/openrct2/ride/RideData.h.
-    Only includes flat ride types (those with flatTrack* StartTrackPiece).
-    Extensible — more fields from the C++ struct can be added as needed.
+    Includes all ride types that have a .Name field in their RTD header.
+    Flat ride footprint fields are only populated for flatTrack* ride types.
     """
 
-    track_elem: str  # e.g. "flatTrack3x3" (TrackElemType name)
-    track_elem_value: int  # resolved TrackElemType enum integer, e.g. 266
-    tiles_x: int  # footprint width in tiles, e.g. 3
-    tiles_y: int  # footprint depth in tiles, e.g. 3
-    clearance_height: (
-        int  # vertical clearance in z-units (from RideHeights.ClearanceHeight)
-    )
+    # Track group restriction data (all ride types)
+    enabled_track_groups: list[str] = []  # camelCase TrackGroup names
+    extra_track_groups: list[str] = []  # cheat-only extra groups
+
+    # Flat ride footprint data (only flatTrack* ride types)
+    track_elem: str | None = None  # e.g. "flatTrack3x3" (TrackElemType name)
+    track_elem_value: int | None = None  # resolved TrackElemType enum integer
+    tiles_x: int | None = None  # footprint width in tiles
+    tiles_y: int | None = None  # footprint depth in tiles
+    clearance_height: int | None = None  # vertical clearance in z-units
 
 
 class ObjectsIR(BaseModel):
@@ -50,4 +53,5 @@ class ObjectsIR(BaseModel):
     objects: list[ObjectDef]  # all objects, all types
     ride_type_descriptors: dict[
         str, RideTypeDescriptor
-    ]  # ride_type name → descriptor (flat rides only)
+    ]  # ride_type name → descriptor
+    track_element_groups: list[str] = []  # index=TrackElemType int → TrackGroup name
