@@ -101,6 +101,8 @@ def parse_objects(
     descriptors = _parse_rtd_headers(source_root, track_elem_values)
     track_element_groups = _parse_track_element_groups(source_root, track_elem_values)
 
+    ride_type_names = _parse_ride_type_names(source_root, descriptors)
+
     return ObjectsIR(
         openrct2_version=version,
         objects_version=objects_version,
@@ -109,6 +111,7 @@ def parse_objects(
         objects=all_objects,
         ride_type_descriptors=descriptors,
         track_element_groups=track_element_groups,
+        ride_type_names=ride_type_names,
     )
 
 
@@ -390,4 +393,70 @@ def _parse_track_element_groups(
             f"expected {expected} (TrackElemType count)"
         )
 
+    return result
+
+
+# ---------------------------------------------------------------------------
+# RideData.cpp parsing — RideType int → RTD .Name mapping
+# ---------------------------------------------------------------------------
+
+# Matches: /* RIDE_TYPE_SPIRAL_ROLLER_COASTER */ SpiralRollerCoasterRTD,
+_RTD_ARRAY_ENTRY_RE = re.compile(r"/\*\s*RIDE_TYPE_\w+\s*\*/\s*(\w+RTD)\s*,")
+
+
+def _parse_ride_type_names(
+    source_root: Path,
+    descriptors: dict[str, RideTypeDescriptor],
+) -> list[str]:
+    """Parse RideData.cpp to build RideType int → RTD .Name mapping.
+
+    Reads the kRideTypeDescriptors[RIDE_TYPE_COUNT] array which maps RideType
+    enum values (by array index) to RTD struct names. Then resolves each RTD
+    struct to its .Name string via the already-parsed descriptors dict.
+
+    Returns a list where index = RideType int, value = RTD .Name string
+    (e.g. "junior_rc"). Empty string for dummy/unused ride type slots.
+    """
+    ride_data_path = source_root / "src" / "openrct2" / "ride" / "RideData.cpp"
+    if not ride_data_path.exists():
+        raise FileNotFoundError(f"RideData.cpp not found: {ride_data_path}")
+
+    content = ride_data_path.read_text(encoding="utf-8", errors="replace")
+
+    # Find the kRideTypeDescriptors array
+    array_match = re.search(
+        r"kRideTypeDescriptors\[RIDE_TYPE_COUNT\]\s*=\s*\{(.*?)\};",
+        content,
+        re.DOTALL,
+    )
+    if not array_match:
+        raise ValueError("kRideTypeDescriptors array not found in RideData.cpp")
+
+    # Build RTD struct name → .Name mapping from RTD headers
+    # We need to match struct names like "JuniorRollerCoasterRTD" to the .Name
+    # values parsed in _parse_rtd_headers(). Parse RTD headers again for struct→name.
+    rtd_dir = source_root / "src" / "openrct2" / "ride" / "rtd"
+    struct_to_name: dict[str, str] = {}
+    for header_path in sorted(rtd_dir.rglob("*.h")):
+        header_content = header_path.read_text(encoding="utf-8", errors="replace")
+        rtd_starts = list(_RTD_DECL_RE.finditer(header_content))
+        for i, decl_match in enumerate(rtd_starts):
+            struct_name = decl_match.group(1)
+            # Extract the full block for this RTD (up to next RTD or EOF)
+            start = decl_match.start()
+            end = rtd_starts[i + 1].start() if i + 1 < len(rtd_starts) else len(header_content)
+            block = header_content[start:end]
+            name_match = _NAME_RE.search(block)
+            if name_match:
+                struct_to_name[struct_name] = name_match.group(1)
+
+    # Extract ordered RTD struct references from the array
+    array_body = array_match.group(1)
+    result: list[str] = []
+    for entry_match in _RTD_ARRAY_ENTRY_RE.finditer(array_body):
+        struct_name = entry_match.group(1)
+        rtd_name = struct_to_name.get(struct_name, "")
+        result.append(rtd_name)
+
+    print(f"Parsed {len(result)} ride type slots, {sum(1 for n in result if n)} with names")
     return result

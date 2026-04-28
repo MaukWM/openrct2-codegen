@@ -12,6 +12,14 @@
 var TG_{{ name | to_screaming_snake }}: number = {{ value }};
 {% endfor %}
 
+// RideType int → RTD name string. Index by ride's .type field.
+// Empty strings are dummy/unused ride type slots.
+var RIDE_TYPE_NAMES: string[] = [
+    {% for name in ride_type_names %}
+    "{{ name }}",
+    {% endfor %}
+];
+
 // Ride type name → set of enabled TrackGroup values.
 // Used to filter which track pieces a ride type can build.
 var RIDE_TYPE_ENABLED_GROUPS: Record<string, Record<number, boolean>> = {
@@ -38,6 +46,13 @@ var TRACK_ELEM_TO_GROUP: number[] = [
     {{ group_int }},
     {% endfor %}
 ];
+
+/**
+ * Get the RTD name for a ride type int.
+ */
+function getRideTypeName(rideType: number): string {
+    return RIDE_TYPE_NAMES[rideType] || "";
+}
 
 /**
  * Check whether a ride type allows a given TrackGroup.
@@ -85,4 +100,41 @@ function getEnabledGroups(rideTypeName: string, includeExtras: boolean): number[
     return result;
 }
 
-export { isTrackGroupEnabled, getTrackGroup, getEnabledGroups, RIDE_TYPE_ENABLED_GROUPS, RIDE_TYPE_EXTRA_GROUPS, TRACK_ELEM_TO_GROUP };
+/**
+ * Compute valid next track segments for a ride type given the current slope and bank.
+ * Filters getAllTrackSegments() by enabled track groups and slope/bank compatibility.
+ */
+function getValidNextSegments(rideType: number, endSlope: number, endBank: number, includeExtras: boolean): number[] {
+    var rtdName = getRideTypeName(rideType);
+    if (!rtdName) {
+        return [];
+    }
+    var segments = context.getAllTrackSegments();
+    var result: number[] = [];
+    for (var i = 0; i < segments.length; i++) {
+        var seg = segments[i];
+        // Filter by track group enabled for this ride type
+        var group = seg.trackGroup;
+        if (!isTrackGroupEnabled(rtdName, group, includeExtras)) {
+            continue;
+        }
+        // Filter by slope/bank compatibility: segment's begin must match current end
+        if (seg.beginSlope !== endSlope || seg.beginBank !== endBank) {
+            continue;
+        }
+        result.push(seg.type);
+    }
+    return result;
+}
+
+export {
+    getRideTypeName,
+    isTrackGroupEnabled,
+    getTrackGroup,
+    getEnabledGroups,
+    getValidNextSegments,
+    RIDE_TYPE_NAMES,
+    RIDE_TYPE_ENABLED_GROUPS,
+    RIDE_TYPE_EXTRA_GROUPS,
+    TRACK_ELEM_TO_GROUP,
+};

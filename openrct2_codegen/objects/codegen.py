@@ -263,6 +263,7 @@ def _render_track_groups_ts(
         objects_version=ir.objects_version,
         generated_at=ir.generated_at,
         track_group_enum=track_group_enum,
+        ride_type_names=ir.ride_type_names,
         enabled_groups=enabled_groups,
         extra_groups=extra_groups,
         track_elem_to_group_ints=track_elem_to_group_ints,

@@ -53,3 +53,4 @@ class ObjectsIR(BaseModel):
     objects: list[ObjectDef]  # all objects, all types
     ride_type_descriptors: dict[str, RideTypeDescriptor]  # ride_type name → descriptor
     track_element_groups: list[str] = []  # index=TrackElemType int → TrackGroup name
+    ride_type_names: list[str] = []  # index=RideType int → RTD .Name string (e.g. "junior_rc")
