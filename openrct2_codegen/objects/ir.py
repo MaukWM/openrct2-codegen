@@ -51,7 +51,5 @@ class ObjectsIR(BaseModel):
     generated_at: str
     generator_version: str
     objects: list[ObjectDef]  # all objects, all types
-    ride_type_descriptors: dict[
-        str, RideTypeDescriptor
-    ]  # ride_type name → descriptor
+    ride_type_descriptors: dict[str, RideTypeDescriptor]  # ride_type name → descriptor
     track_element_groups: list[str] = []  # index=TrackElemType int → TrackGroup name

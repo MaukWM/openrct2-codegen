@@ -182,14 +182,28 @@ _FILTERS = {
 }
 
 
-def render_template(template_name: str, ir: ObjectsIR) -> str:
-    """Render an objects codegen template with the given IR."""
+def render_template(
+    template_name: str,
+    ir: ObjectsIR,
+    track_group_values: dict[str, int] | None = None,
+) -> str:
+    """Render an objects codegen template with the given IR.
+
+    Args:
+        template_name: Template file name (without .j2).
+        ir: The objects IR.
+        track_group_values: TrackGroup camelCase name → int value mapping
+            (from enums IR). Required for track-groups.ts template.
+    """
     j2_file = _TEMPLATES_DIR / f"{template_name}.j2"
     if not j2_file.is_file():
         raise ValueError(f"Unknown template: {template_name!r} (no file at {j2_file})")
 
     env = make_env(_TEMPLATES_DIR, _FILTERS)
     template = env.get_template(j2_file.name)
+
+    if template_name == "track-groups.ts":
+        return _render_track_groups_ts(template, ir, track_group_values or {})
 
     ride_objects = _prepare_ride_objects(ir)
     categories = _group_by_category(ride_objects, ir)
@@ -209,4 +223,47 @@ def render_template(template_name: str, ir: ObjectsIR) -> str:
         footpath_surfaces=footpath_surfaces,
         footpath_additions=footpath_additions,
         footpath_railings=footpath_railings,
+    )
+
+
+def _render_track_groups_ts(
+    template: Any,
+    ir: ObjectsIR,
+    track_group_values: dict[str, int],
+) -> str:
+    """Render the track-groups.ts template with int-resolved group data."""
+    # Resolve enabledTrackGroups: ride_type → list of TrackGroup ints
+    enabled_groups: dict[str, list[int]] = {}
+    extra_groups: dict[str, list[int]] = {}
+    for rt_name, desc in ir.ride_type_descriptors.items():
+        if desc.enabled_track_groups:
+            enabled_groups[rt_name] = [
+                track_group_values[g]
+                for g in desc.enabled_track_groups
+                if g in track_group_values
+            ]
+        if desc.extra_track_groups:
+            extra_groups[rt_name] = [
+                track_group_values[g]
+                for g in desc.extra_track_groups
+                if g in track_group_values
+            ]
+
+    # Resolve track_element_groups: list of TrackGroup ints
+    track_elem_to_group_ints = [
+        track_group_values.get(g, -1) for g in ir.track_element_groups
+    ]
+
+    # TrackGroup enum as (name, value) pairs
+    track_group_enum = sorted(track_group_values.items(), key=lambda x: x[1])
+
+    return template.render(
+        generator_version=ir.generator_version,
+        openrct2_version=ir.openrct2_version,
+        objects_version=ir.objects_version,
+        generated_at=ir.generated_at,
+        track_group_enum=track_group_enum,
+        enabled_groups=enabled_groups,
+        extra_groups=extra_groups,
+        track_elem_to_group_ints=track_elem_to_group_ints,
     )

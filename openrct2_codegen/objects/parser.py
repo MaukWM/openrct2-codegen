@@ -44,20 +44,14 @@ _HEIGHT_CONST_RE = re.compile(
 )
 
 # Matches: constexpr RideTypeDescriptor FlyingRollerCoasterRTD =
-_RTD_DECL_RE = re.compile(
-    r"constexpr\s+RideTypeDescriptor\s+(\w+)\s*="
-)
+_RTD_DECL_RE = re.compile(r"constexpr\s+RideTypeDescriptor\s+(\w+)\s*=")
 
 # Matches: .enabledTrackGroups = { TrackGroup::flat, ... }
 # or:      .enabledTrackGroups = {  }  (empty)
-_ENABLED_GROUPS_RE = re.compile(
-    r"\.enabledTrackGroups\s*=\s*\{([^}]*)\}"
-)
+_ENABLED_GROUPS_RE = re.compile(r"\.enabledTrackGroups\s*=\s*\{([^}]*)\}")
 
 # Matches: .extraTrackGroups = { TrackGroup::liftHillSteep, ... }
-_EXTRA_GROUPS_RE = re.compile(
-    r"\.extraTrackGroups\s*=\s*\{([^}]*)\}"
-)
+_EXTRA_GROUPS_RE = re.compile(r"\.extraTrackGroups\s*=\s*\{([^}]*)\}")
 
 # Matches: TrackGroup::flatRollBanking
 _TRACK_GROUP_REF_RE = re.compile(r"TrackGroup::(\w+)")
@@ -259,11 +253,7 @@ def _parse_rtd_headers(
         for i, decl_match in enumerate(rtd_starts):
             # Extract the region for this RTD (up to next RTD or end of file)
             start = decl_match.start()
-            end = (
-                rtd_starts[i + 1].start()
-                if i + 1 < len(rtd_starts)
-                else len(content)
-            )
+            end = rtd_starts[i + 1].start() if i + 1 < len(rtd_starts) else len(content)
             block = content[start:end]
 
             # .Name is required — skip RTD blocks without it
@@ -276,14 +266,10 @@ def _parse_rtd_headers(
             # (which is inside .TrackPaintFunctions, before .InvertedTrackPaintFunctions)
             enabled_match = _ENABLED_GROUPS_RE.search(block)
             enabled = (
-                _extract_track_groups(enabled_match.group(1))
-                if enabled_match
-                else []
+                _extract_track_groups(enabled_match.group(1)) if enabled_match else []
             )
             extra_match = _EXTRA_GROUPS_RE.search(block)
-            extra = (
-                _extract_track_groups(extra_match.group(1)) if extra_match else []
-            )
+            extra = _extract_track_groups(extra_match.group(1)) if extra_match else []
 
             # Check for flat ride footprint data
             track_match = _START_TRACK_RE.search(block)

@@ -147,7 +147,7 @@ def generate(
 _ACTIONS_TEMPLATES = {"actions.ts", "actions.py"}
 _STATE_TEMPLATES = {"state.ts", "state.py"}
 _ENUMS_TEMPLATES = {"enums.py"}
-_OBJECTS_TEMPLATES = {"objects.py"}
+_OBJECTS_TEMPLATES = {"objects.py", "track-groups.ts"}
 
 
 @main.command()
@@ -214,7 +214,25 @@ def render(
         from openrct2_codegen.objects.ir import ObjectsIR
 
         objects_ir = ObjectsIR.model_validate_json(ir.read_text())
-        rendered = objects_codegen.render_template(template, objects_ir)
+
+        # track-groups.ts needs TrackGroup enum values from enums IR
+        track_group_values: dict[str, int] | None = None
+        if template == "track-groups.ts":
+            if not _DEFAULT_ENUMS_IR.exists():
+                raise click.ClickException(
+                    f"Enums IR not found: {_DEFAULT_ENUMS_IR} — run 'generate' first."
+                )
+            enums_ir = EnumsIR.model_validate_json(_DEFAULT_ENUMS_IR.read_text())
+            tg_enum = enums_ir.enums.get("TrackGroup")
+            if tg_enum is None:
+                raise click.ClickException(
+                    "TrackGroup enum not found in enums IR — regenerate with latest codegen."
+                )
+            track_group_values = {v.name: v.value for v in tg_enum.values}
+
+        rendered = objects_codegen.render_template(
+            template, objects_ir, track_group_values=track_group_values
+        )
     else:
         ir = ir or _DEFAULT_ACTIONS_IR
         if not ir.exists():
