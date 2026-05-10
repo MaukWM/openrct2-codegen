@@ -100,31 +100,82 @@ function getEnabledGroups(rideTypeName: string, includeExtras: boolean): number[
     return result;
 }
 
+// kNextSelectedPiece table from RideConstruction.cpp.
+// Each entry: [isDiagonal, slopeStart, rollStart, trackCurve, slopeEnd, rollEnd, trackElement]
+// Used by the game UI to determine which track pieces the player can place.
+var NEXT_SELECTED_PIECE: number[][] = [
+{% for entry in next_selected_pieces %}
+    [{{ entry[0] }},{{ entry[1] }},{{ entry[2] }},{{ entry[3] }},{{ entry[4] }},{{ entry[5] }},{{ entry[6] }}],
+{% endfor %}
+];
+
 /**
- * Compute valid next track segments for a ride type given the current slope and bank.
- * Filters getAllTrackSegments() by enabled track groups and slope/bank compatibility.
+ * Compute valid next track segments matching the game UI's piece selection.
+ *
+ * Uses the kNextSelectedPiece table (same as C++ GetTrackTypeFromCurve) filtered
+ * by (slopeStart, rollStart) + ride type's enabledTrackGroups.
+ * Only orthogonal pieces (isDiagonal=0) — diagonal track is not supported.
+ * Also adds flat special pieces (brakes, boosters, on-ride photo) when applicable.
  */
-function getValidNextSegments(rideType: number, endSlope: number, endBank: number, includeExtras: boolean): number[] {
+function getValidNextSegments(
+    rideType: number, endSlope: number, endBank: number,
+    _isDiagonal: boolean, includeExtras: boolean
+): number[] {
     var rtdName = getRideTypeName(rideType);
-    if (!rtdName) {
-        return [];
-    }
-    var segments = context.getAllTrackSegments();
+    if (!rtdName) return [];
+
     var result: number[] = [];
-    for (var i = 0; i < segments.length; i++) {
-        var seg = segments[i];
-        // Filter by track group enabled for this ride type
-        var group = seg.trackGroup;
-        if (!isTrackGroupEnabled(rtdName, group, includeExtras)) {
-            continue;
-        }
-        // Filter by slope/bank compatibility: segment's begin must match current end
-        if (seg.beginSlope !== endSlope || seg.beginBank !== endBank) {
-            continue;
-        }
-        result.push(seg.type);
+
+    // Step 1: kNextSelectedPiece table — orthogonal entries (isDiag=0) matching current state
+    for (var i = 0; i < NEXT_SELECTED_PIECE.length; i++) {
+        var e = NEXT_SELECTED_PIECE[i];
+        if (e[0] !== 0 || e[1] !== endSlope || e[2] !== endBank) continue;
+        var elemType = e[6];
+        var group = TRACK_ELEM_TO_GROUP[elemType];
+        if (group === undefined) continue;
+        if (!isTrackGroupEnabled(rtdName, group, includeExtras)) continue;
+        result.push(elemType);
     }
+
+    // Step 2: Special pieces not in the kNextSelectedPiece table.
+    // Corkscrews, loops, barrel rolls, brakes, boosters, on-ride photo, etc.
+    // are standalone UI options not covered by the curve-based table.
+    // Add any orthogonal segment with matching slope/bank and enabled TrackGroup
+    // that isn't already in the result.
+    var segs = context.getAllTrackSegments();
+    for (var si = 0; si < segs.length; si++) {
+        var seg = segs[si];
+        if (seg.beginSlope !== endSlope || seg.beginBank !== endBank) continue;
+        if (seg.beginDirection >= 4) continue;  // skip diagonal
+        var sg = seg.trackGroup;
+        if (!isTrackGroupEnabled(rtdName, sg, includeExtras)) continue;
+        // Avoid duplicates (already in table results)
+        var dup = false;
+        for (var ri = 0; ri < result.length; ri++) {
+            if (result[ri] === seg.type) { dup = true; break; }
+        }
+        if (!dup) result.push(seg.type);
+    }
+
     return result;
+}
+
+/**
+ * Check if a just-placed piece chains to a specific special piece (loop, corkscrew, etc.)
+ * via curveChain.next (exposed as nextSuggestedSegment in plugin API).
+ * Returns the TrackElemType int if valid for this ride type, or -1.
+ */
+function getSpecialNextSegment(trackType: number, rideType: number, includeExtras: boolean): number {
+    var rtdName = getRideTypeName(rideType);
+    if (!rtdName) return -1;
+    var seg = context.getTrackSegment(trackType);
+    if (!seg) return -1;
+    var next = seg.nextSuggestedSegment;
+    if (typeof next !== "number") return -1;
+    var group = TRACK_ELEM_TO_GROUP[next];
+    if (group === undefined) return -1;
+    if (!isTrackGroupEnabled(rtdName, group, includeExtras)) return -1;
+    return next;
 }
 
 export {
@@ -133,8 +184,10 @@ export {
     getTrackGroup,
     getEnabledGroups,
     getValidNextSegments,
+    getSpecialNextSegment,
     RIDE_TYPE_NAMES,
     RIDE_TYPE_ENABLED_GROUPS,
     RIDE_TYPE_EXTRA_GROUPS,
     TRACK_ELEM_TO_GROUP,
+    NEXT_SELECTED_PIECE,
 };

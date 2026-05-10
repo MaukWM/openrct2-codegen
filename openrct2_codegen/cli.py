@@ -129,12 +129,24 @@ def generate(
     track_elem_values = {
         v.name: v.value for v in enums_ir.enums["TrackElemType"].values
     }
+    track_pitch_values = {
+        v.name: v.value for v in enums_ir.enums["TrackPitch"].values
+    }
+    track_roll_values = {
+        v.name: v.value for v in enums_ir.enums["TrackRoll"].values
+    }
+    track_curve_values = {
+        v.name: v.value for v in enums_ir.enums["TrackCurve"].values
+    }
     objects_ir = parse_objects(
         source_root,
         objects_root,
         version=version,
         objects_version=obj_version,
         track_elem_values=track_elem_values,
+        track_pitch_values=track_pitch_values,
+        track_roll_values=track_roll_values,
+        track_curve_values=track_curve_values,
     )
     click.echo(
         f"Parsed {len(objects_ir.objects)} objects, "

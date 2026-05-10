@@ -267,4 +267,5 @@ def _render_track_groups_ts(
         enabled_groups=enabled_groups,
         extra_groups=extra_groups,
         track_elem_to_group_ints=track_elem_to_group_ints,
+        next_selected_pieces=ir.next_selected_pieces,
     )

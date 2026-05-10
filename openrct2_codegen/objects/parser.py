@@ -86,6 +86,9 @@ def parse_objects(
     version: str,
     objects_version: str,
     track_elem_values: dict[str, int],
+    track_pitch_values: dict[str, int],
+    track_roll_values: dict[str, int],
+    track_curve_values: dict[str, int],
 ) -> ObjectsIR:
     """Parse all objects and ride type descriptors into the objects IR.
 
@@ -94,14 +97,20 @@ def parse_objects(
         objects_root: Path to OpenRCT2 objects repo root (for object JSON files).
         version: OpenRCT2 version string.
         objects_version: OpenRCT2/objects repo version string.
-        track_elem_values: TrackElemType enum name → int value mapping
-            (from enums IR). Used to resolve track_elem_value on descriptors.
+        track_elem_values: TrackElemType enum name → int value mapping.
+        track_pitch_values: TrackPitch enum name → int value mapping.
+        track_roll_values: TrackRoll enum name → int value mapping.
+        track_curve_values: TrackCurve enum name → int value mapping.
     """
     all_objects = _parse_all_objects(objects_root)
     descriptors = _parse_rtd_headers(source_root, track_elem_values)
     track_element_groups = _parse_track_element_groups(source_root, track_elem_values)
-
     ride_type_names = _parse_ride_type_names(source_root, descriptors)
+
+    next_selected_pieces = _parse_next_selected_piece_table(
+        source_root, track_elem_values,
+        track_pitch_values, track_roll_values, track_curve_values,
+    )
 
     return ObjectsIR(
         openrct2_version=version,
@@ -112,6 +121,7 @@ def parse_objects(
         ride_type_descriptors=descriptors,
         track_element_groups=track_element_groups,
         ride_type_names=ride_type_names,
+        next_selected_pieces=next_selected_pieces,
     )
 
 
@@ -391,6 +401,68 @@ def _parse_track_element_groups(
         print(
             f"Warning: parsed {len(result)} track element groups, "
             f"expected {expected} (TrackElemType count)"
+        )
+
+    return result
+
+
+# ---------------------------------------------------------------------------
+# RideConstruction.cpp parsing — kNextSelectedPiece table
+# ---------------------------------------------------------------------------
+
+# Matches one entry of the kNextSelectedPiece[186] array.
+_NEXT_PIECE_RE = re.compile(
+    r"\{\s*(true|false)\s*,"
+    r"\s*TrackPitch::(\w+)\s*,"
+    r"\s*TrackRoll::(\w+)\s*,"
+    r"\s*TrackCurve::(\w+)\s*,"
+    r"\s*TrackPitch::(\w+)\s*,"
+    r"\s*TrackRoll::(\w+)\s*,"
+    r"\s*TrackElemType::(\w+)\s*\}"
+)
+
+
+def _parse_next_selected_piece_table(
+    source_root: Path,
+    track_elem_values: dict[str, int],
+    track_pitch_values: dict[str, int],
+    track_roll_values: dict[str, int],
+    track_curve_values: dict[str, int],
+) -> list[list[int]]:
+    """Parse kNextSelectedPiece[186] from RideConstruction.cpp.
+
+    Returns list of [startsDiag(0/1), slopeStart, rollStart, trackCurve,
+    slopeEnd, rollEnd, trackElement] int arrays.
+    """
+    path = source_root / "src" / "openrct2" / "ride" / "RideConstruction.cpp"
+    if not path.exists():
+        raise FileNotFoundError(f"RideConstruction.cpp not found: {path}")
+
+    src = path.read_text(encoding="utf-8", errors="replace")
+
+    # Find the kNextSelectedPiece array body
+    array_match = re.search(
+        r"kNextSelectedPiece\s*\[\s*\d+\s*\]\s*=\s*\{(.*?)\};",
+        src,
+        re.DOTALL,
+    )
+    if not array_match:
+        raise ValueError("kNextSelectedPiece array not found in RideConstruction.cpp")
+
+    result: list[list[int]] = []
+    for m in _NEXT_PIECE_RE.finditer(array_match.group(1)):
+        diag = 1 if m.group(1) == "true" else 0
+        slope_start = track_pitch_values[m.group(2)]
+        roll_start = track_roll_values[m.group(3)]
+        curve = track_curve_values[m.group(4)]
+        slope_end = track_pitch_values[m.group(5)]
+        roll_end = track_roll_values[m.group(6)]
+        elem = track_elem_values[m.group(7)]
+        result.append([diag, slope_start, roll_start, curve, slope_end, roll_end, elem])
+
+    if len(result) != 186:
+        print(
+            f"Warning: parsed {len(result)} kNextSelectedPiece entries, expected 186"
         )
 
     return result
