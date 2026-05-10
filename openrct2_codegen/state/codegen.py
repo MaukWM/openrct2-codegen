@@ -9,6 +9,14 @@ from openrct2_codegen.state.ir import StateIR
 
 _TEMPLATES_DIR = Path(__file__).parent / "templates"
 
+# TypeScript `number` fields that are actually fractional (G-forces, etc.).
+# Keyed by (interface_name, field_name).
+_FLOAT_FIELDS: set[tuple[str, str]] = {
+    ("Ride", "maxPositiveVerticalGs"),
+    ("Ride", "maxNegativeVerticalGs"),
+    ("Ride", "maxLateralGs"),
+}
+
 
 def _camel_to_snake(name: str) -> str:
     """Convert camelCase to snake_case: 'bankLoan' → 'bank_loan'."""
@@ -23,7 +31,10 @@ def _py_type(prop: dict) -> str:
 
     if ir_type == "scalar":
         if ts_type == "number":
-            base = "int"
+            if prop.get("_force_float"):
+                base = "float"
+            else:
+                base = "int"
         elif ts_type == "boolean":
             base = "bool"
         elif ts_type == "string":
@@ -119,13 +130,18 @@ def _topo_sort_interfaces(
 ) -> list[str]:
     """Topologically sort interface names so dependencies come first."""
 
-    def _deps(iface) -> set[str]:
-        deps: set[str] = set()
+    def _deps(iface) -> list[str]:
+        seen: set[str] = set()
+        deps: list[str] = []
         for p in iface.properties:
+            name = None
             if p.ir_type == "interface":
-                deps.add(p.interface)
+                name = p.interface
             elif p.ir_type == "array" and p.item_kind == "interface":
-                deps.add(p.item_type)
+                name = p.item_type
+            if name and name not in seen:
+                seen.add(name)
+                deps.append(name)
         return deps
 
     name_set = set(names)
@@ -209,6 +225,14 @@ def render_template(template_name: str, ir: StateIR) -> str:
 
     # For Python: all models in topo order (union variants interleaved with leaves)
     all_models = [ir.interfaces[n].model_dump() for n in all_model_names]
+
+    # Tag fields that should be float instead of int
+    for model_list in [union_variants, other_leaves, all_models]:
+        for model in model_list:
+            iface_name = model["name"]
+            for prop in model.get("properties", []):
+                if (iface_name, prop["name"]) in _FLOAT_FIELDS:
+                    prop["_force_float"] = True
 
     return template.render(
         generator_version=ir.generator_version,
